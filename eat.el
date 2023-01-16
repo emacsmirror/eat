@@ -157,6 +157,44 @@ FUNCTION      Call FUNCTION with the command and arguments (using
   :type 'boolean
   :group 'eat-eshell)
 
+(defcustom eat-semi-char-non-bound-keys
+  '([?\C-x] [?\C-\\] [?\C-q] [?\C-g] [?\C-h] [?\e ?\C-c] [?\C-u]
+    [?\e ?x] [?\e ?:] [?\e ?!] [?\e ?&])
+  "List of keys not bound in Eat \"semi-char\" mode.
+
+Keys appearing in this list are not bound to send the key to terminal.
+Eat might still bound them to do something else (for example, changing
+keybinding mode).
+
+Each element is a vector of form [KEY] or [?\e KEY], meaning KEY or
+M-KEY shouldn't be bound.  KEY shouldn't contain Meta (Alt) modifier."
+  :type '(repeat sexp)
+  :set (lambda (sym val)
+         (set-default-toplevel-value sym val)
+         (when (boundp 'eat-semi-char-mode-map)
+           (setq eat-semi-char-mode-map
+                 (eat--prepare-semi-char-mode-map))))
+  :group 'eat-ui)
+
+(defcustom eat-eshell-semi-char-non-bound-keys
+  '([?\C-\\] [?\C-x] [?\C-g] [?\C-h] [?\e ?\C-c] [?\C-u] [?\C-q]
+    [?\e ?x] [?\e ?:] [?\e ?!] [?\e ?&])
+  "List of keys not bound in Eat-Eshell \"semi-char\" mode.
+
+Keys appearing in this list are not bound to send the key to terminal.
+Eat might still bound them to do something else (for example, changing
+keybinding mode).
+
+Each element is a vector of form [KEY] or [?\e KEY], meaning KEY or
+M-KEY shouldn't be bound.  KEY shouldn't contain Meta (Alt) modifier."
+  :type '(repeat sexp)
+  :set (lambda (sym val)
+         (set-default-toplevel-value sym val)
+         (when (boundp 'eat-eshell-semi-char-mode-map)
+           (setq eat-eshell-semi-char-mode-map
+                 (eat--eshell-prepare-semi-char-mode-map))))
+  :group 'eat-eshell)
+
 (defcustom eat-enable-directory-tracking t
   "Non-nil means do directory tracking.
 
@@ -4820,13 +4858,12 @@ STRING and ARG are passed to `yank-pop', which see."
     map)
   "Keymap for Eat mode.")
 
-(defvar eat-semi-char-mode-map
+(defun eat--prepare-semi-char-mode-map ()
+  "Prepare `eat-semi-char-mode-map'."
   (let ((map (eat-term-make-keymap
-              #'eat-self-input
-              '(:ascii :arrow :navigation)
-              '( [?\C-\\] [?\C-q] [?\C-c] [?\C-x] [?\C-g] [?\C-h]
-                 [?\e ?\C-c] [?\C-u] [?\C-q] [?\e ?x] [?\e ?:]
-                 [?\e ?!] [?\e ?&] [?\C-y] [?\e ?y]))))
+              #'eat-self-input '(:ascii :arrow :navigation)
+              `([?\C-c] [?\C-q] [?\C-y] [?\e ?y]
+                ,@eat-semi-char-non-bound-keys))))
     (define-key map [?\C-q] #'eat-quoted-input)
     (define-key map [?\C-y] #'eat-yank)
     (define-key map [?\M-y] #'eat-yank-from-kill-ring)
@@ -4834,13 +4871,15 @@ STRING and ARG are passed to `yank-pop', which see."
     (define-key map [?\C-c ?\C-e] #'eat-emacs-mode)
     (define-key map [remap insert-char] #'eat-input-char)
     (define-key map [xterm-paste] #'eat-xterm-paste)
-    map)
+    map))
+
+(defvar eat-semi-char-mode-map (ignore-errors
+                                 (eat--prepare-semi-char-mode-map))
   "Keymap for Eat semi-char mode.")
 
 (defvar eat-char-mode-map
   (let ((map (eat-term-make-keymap
-              #'eat-self-input
-              '(:ascii :arrow :navigation :function)
+              #'eat-self-input '(:ascii :arrow :navigation :function)
               '([?\e ?\C-m]))))
     (define-key map [?\C-\M-m] #'eat-semi-char-mode)
     (define-key map [xterm-paste] #'eat-xterm-paste)
@@ -5461,26 +5500,28 @@ PROGRAM can be a shell command."
     map)
   "Keymap for Eat Eshell \"emacs\" mode.")
 
-(defvar eat-eshell-semi-char-mode-map
+(defun eat--eshell-prepare-semi-char-mode-map ()
+  "Prepare `eat-eshell-semi-char-mode-map'."
   (let ((map (eat-term-make-keymap
-              #'eat-self-input
-              '(:ascii :arrow :navigation)
-              '( [?\C-\\] [?\C-q] [?\C-c] [?\C-x] [?\C-g] [?\C-h]
-                 [?\e ?\C-c] [?\C-u] [?\C-q] [?\e ?x] [?\e ?:]
-                 [?\e ?!] [?\e ?&] [?\C-y] [?\e ?y]))))
+              #'eat-self-input '(:ascii :arrow :navigation)
+              `([?\C-c] [?\C-q] [?\C-y] [?\e ?y]
+                ,@eat-eshell-semi-char-non-bound-keys))))
     (define-key map [?\C-q] #'eat-quoted-input)
     (define-key map [?\C-y] #'eat-yank)
     (define-key map [?\M-y] #'eat-yank-from-kill-ring)
     (define-key map [?\C-c ?\C-e] #'eat-eshell-emacs-mode)
     (define-key map [remap insert-char] #'eat-input-char)
     (define-key map [xterm-paste] #'eat-xterm-paste)
-    map)
+    map))
+
+(defvar eat-eshell-semi-char-mode-map
+  (ignore-errors
+    (eat--eshell-prepare-semi-char-mode-map))
   "Keymap for Eat Eshell semi-char mode.")
 
 (defvar eat-eshell-char-mode-map
   (let ((map (eat-term-make-keymap
-              #'eat-self-input
-              '(:ascii :arrow :navigation :function)
+              #'eat-self-input '(:ascii :arrow :navigation :function)
               '([?\e ?\C-m]))))
     (define-key map [?\C-\M-m] #'eat-eshell-semi-char-mode)
     (define-key map [xterm-paste] #'eat-xterm-paste)
