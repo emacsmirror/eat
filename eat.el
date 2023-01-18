@@ -166,8 +166,8 @@ Keys appearing in this list are not bound to send the key to terminal.
 Eat might still bound them to do something else (for example, changing
 keybinding mode).
 
-Each element is a vector of form [KEY] or [?\e KEY], meaning KEY or
-M-KEY shouldn't be bound.  KEY shouldn't contain Meta (Alt) modifier."
+Each element is a vector of form [KEY] or [?\\e KEY], meaning KEY or
+M-KEY shouldn't be bound.  KEY shouldn't contain meta (Alt) modifier."
   :type '(repeat sexp)
   :set (lambda (sym val)
          (set-default-toplevel-value sym val)
@@ -185,8 +185,8 @@ Keys appearing in this list are not bound to send the key to terminal.
 Eat might still bound them to do something else (for example, changing
 keybinding mode).
 
-Each element is a vector of form [KEY] or [?\e KEY], meaning KEY or
-M-KEY shouldn't be bound.  KEY shouldn't contain Meta (Alt) modifier."
+Each element is a vector of form [KEY] or [?\\e KEY], meaning KEY or
+M-KEY shouldn't be bound.  KEY shouldn't contain meta (Alt) modifier."
   :type '(repeat sexp)
   :set (lambda (sym val)
          (set-default-toplevel-value sym val)
