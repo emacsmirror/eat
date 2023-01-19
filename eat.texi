@@ -294,6 +294,15 @@ modifier.  To not bind a key with meta modifier, use a vector of form
 @code{[?\e @var{key}]}, where @var{key} is the key without meta
 modifier.
 
+@findex eat-update-semi-char-mode-map
+@findex eat-eshell-update-semi-char-mode-map
+@findex eat-reload
+If you set the user options manually (for example, with @code{setq}),
+you must call @code{eat-update-semi-char-mode-map} or
+@code{eat-eshell-update-semi-char-mode-map} respectively, and finally
+reload Eat (you can do this with the command @command{eat-reload}).
+Or alternatively you can set the user options before Eat is loaded.
+
 @anchor{Char Mode}
 @cindex char mode
 @cindex mode, char
