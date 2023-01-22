@@ -1,6 +1,6 @@
 ;;; eat.el --- Emulate A Terminal, in a region, in a buffer and in Eshell -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2022 Akib Azmain Turja.
+;; Copyright (C) 2022, 2023 Akib Azmain Turja.
 
 ;; Author: Akib Azmain Turja <akib@disroot.org>
 ;; Created: 2022-08-15

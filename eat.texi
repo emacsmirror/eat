@@ -2,7 +2,7 @@
 
 @comment %**start of header
 @setfilename eat.info
-@set UPDATED 10 December 2022
+@set UPDATED 22 January 2023
 @set EDITION 0.4
 @set VERSION 0.4
 @documentencoding UTF-8
@@ -18,7 +18,7 @@
 This manual is for Eat (version @value{VERSION}, @value{UPDATED}), a
 terminal emulator for Emacs.
 
-Copyright @copyright{}  2022  Akib Azmain Turja.
+Copyright @copyright{}  2022, 2023  Akib Azmain Turja.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
