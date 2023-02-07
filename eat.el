@@ -146,6 +146,17 @@ This is left disabled for security reasons."
   :group 'eat-ui
   :group 'eat-eshell)
 
+(defcustom eat-query-before-killing-running-terminal 'auto
+  "Whether to query before killing running terminal.
+
+If the value is t, always query.  If the value is nil, never query.
+If the value is `auto', query if a shell command is running (shell
+integration needs to be enabled to use this properly)."
+  :type '(choice (const :tag "Yes" t)
+                 (const :tag "No" nil)
+                 (const :tag "If a shell command is running" auto))
+  :group 'eat-ui)
+
 (defcustom eat-eshell-fallback-if-stty-not-available 'ask
   "What to do if `stty' is unavailable.
 
@@ -4568,7 +4579,11 @@ If HOST isn't the host Emacs is running on, don't do anything."
 
 (defun eat--pre-prompt (_)
   "Save the beginning position of shell prompt."
-  (setq eat--shell-prompt-begin (point-marker)))
+  (setq eat--shell-prompt-begin (point-marker))
+  ;; FIXME: It's a crime to touch processes in this section.
+  (when (eq eat-query-before-killing-running-terminal 'auto)
+    (when (bound-and-true-p eat--process)
+      (set-process-query-on-exit-flag eat--process nil))))
 
 (defun eat--post-prompt (_)
   "Put a mark in the marginal area on current line."
@@ -4670,6 +4685,10 @@ BUFFER is the terminal buffer."
 
 (defun eat--pre-cmd (_)
   "Update shell prompt mark to indicate command is running."
+  ;; FIXME: It's a crime to touch processes in this section.
+  (when (eq eat-query-before-killing-running-terminal 'auto)
+    (when (bound-and-true-p eat--process)
+      (set-process-query-on-exit-flag eat--process t)))
   (when (and eat-enable-shell-prompt-annotation
              eat--shell-prompt-mark)
     (setf (cadr eat--shell-prompt-mark)
@@ -5469,6 +5488,8 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
                :file-handler t)))
         (process-put process 'adjust-window-size-function
                      #'eat--adjust-process-window-size)
+        (set-process-query-on-exit-flag
+         process eat-query-before-killing-running-terminal)
         ;; Jump to the end, and set the process mark.
         (goto-char (point-max))
         (set-marker (process-mark process) (point))
