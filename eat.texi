@@ -66,6 +66,7 @@ Basic Operations
 
 Advanced Customizations
 * Shell Integration::   Getting the most from Eat and your shell.
+* Querying Before Kill::  Confirming before you kill your terminal.
 * Display::             The region where everything is shown.
 * Scrollback::          Region for things that went out of display.
 * Cursor Types::        Cursor can displayed in many forms.
@@ -465,6 +466,32 @@ the user option
 face @code{eat-shell-prompt-annotation-failure} control the indicator
 used to indicate the command has exited unsuccessfully with non-zero
 exit status.
+
+@node Querying Before Kill
+@cindex querying before kill
+@cindex querying before kill terminal
+@cindex confirm before kill
+@cindex confirm before kill terminal
+@cindex terminal, kill, query
+@cindex terminal, kill, confirm
+@chapter Querying Before Kill
+
+When a terminal is killed, the terminal process is also killed.  Since
+the process can do some important things, Eat asks for confirmation
+before killing a terminal with running process by default.  Eat
+provides the user option
+@code{eat-query-before-killing-running-terminal} to control this.
+
+@vindex eat-query-before-killing-running-terminal
+@defopt eat-query-before-killing-running-terminal
+When set to @code{nil}, Eat would never ask.  When set to @code{t},
+Eat would always ask for confirmation.  When set to @code{auto}, Eat
+would ask only if a shell command is running inside the shell running
+in the terminal.  This is effective only after shell integration is
+enabled in the shell (@pxref{Shell Integration}) (i.e. after the shell
+integration code is executed on shell); before that it is essentially
+same as @code{t}, and Eat will always query.
+@end defopt
 
 @node Display
 @cindex display
