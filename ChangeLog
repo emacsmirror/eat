@@ -1,3 +1,18 @@
+2023-02-08  Akib Azmain Turja  <akib@disroot.org>
+
+	* eat.texi (Querying Before Kill): New chapter
+
+2023-02-07  Akib Azmain Turja  <akib@disroot.org>
+
+	Query when killing buffer when command is running
+
+	* eat.el (eat-query-before-killing-running-terminal): New user
+	option.
+	* eat.el (eat--pre-prompt): Unset process query on exit flag if
+	eat-query-before-killing-running-terminal is 'auto'.
+	* eat.el (eat--pre-cmd): Set process query on exit flag if
+	eat-query-before-killing-running-terminal is 'auto'.
+
 2023-01-22  Akib Azmain Turja  <akib@disroot.org>
 
 	Add many more semi-char mode exceptions
