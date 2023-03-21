@@ -5747,6 +5747,9 @@ PROGRAM can be a shell command."
     (setf (eat-term-set-cwd-function eat--terminal) #'eat--set-cwd)
     (setf (eat-term-set-cmd-function eat--terminal) #'eat--set-cmd)
     (setf (eat-term-parameter eat--terminal 'eat--process) proc)
+    (unless (>= emacs-major-version 29)
+      (setf (eat-term-parameter eat--terminal 'eat--input-process)
+            proc))
     (setf (eat-term-parameter eat--terminal 'eat--output-process)
           proc)
     (when-let* ((window (get-buffer-window nil t)))
@@ -6082,8 +6085,9 @@ symbol `buffer', in which case the point of current buffer is set."
             ,@eshell-variable-aliases-list))
     (advice-add #'eshell-gather-process-output :around
                 #'eat--eshell-adjust-make-process-args)
-    (advice-add #'eshell-resume-eval :after
-                #'eat--eshell-set-input-process))
+    (when (>= emacs-major-version 29)
+      (advice-add #'eshell-resume-eval :after
+                  #'eat--eshell-set-input-process)))
    (t
     (let ((buffers nil))
       (setq eat-eshell-mode t)
@@ -6115,8 +6119,9 @@ symbol `buffer', in which case the point of current buffer is set."
            eshell-variable-aliases-list))
     (advice-remove #'eshell-gather-process-output
                    #'eat--eshell-adjust-make-process-args)
-    (advice-remove #'eshell-resume-eval
-                   #'eat--eshell-set-input-process))))
+    (when (>= emacs-major-version 29)
+      (advice-remove #'eshell-resume-eval
+                     #'eat--eshell-set-input-process)))))
 
 
 ;;;; Eshell Visual Command Handling.
