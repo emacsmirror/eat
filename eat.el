@@ -976,7 +976,7 @@ Nil when not in alternative display mode.")
   (mouse-encoding nil :documentation "Current mouse event encoding.")
   (focus-event-mode nil :documentation "Whether to send focus event.")
   (cut-buffers
-   (1value (make-vector 10 nil))
+   (1value (make-vector 8 nil))
    :documentation "Cut buffers.")
   ;; NOTE: Change the default value of parameters when changing this.
   (bold-face 'eat-term-bold :documentation "Face for bold text.")
@@ -2604,8 +2604,8 @@ output."
   "Set and send current selection.
 
 TARGETS is a string containing zero or more characters from the set
-`c', `p', `q', `s', `0', `1', `2', `3', `4', `5', `6', `7', `8', `9'.
-DATA is the selection data encoded in base64."
+`c', `p', `q', `s', `0', `1', `2', `3', `4', `5', `6', and `7'.  DATA
+is the selection data encoded in base64."
   (when (string-empty-p targets)
     (setq targets "s0"))
   (if (string= data "?")
@@ -2614,8 +2614,16 @@ DATA is the selection data encoded in base64."
       (funcall
        (eat--t-term-input-fn eat--t-term) eat--t-term
        (let ((str nil)
-             (source nil)
              (n 0))
+         ;; Remove invalid and duplicate targets from TARGETS before
+         ;; processing it and sending it back.
+         (setq targets
+               (apply #'string
+                      (cl-delete-duplicates
+                       (cl-delete-if-not
+                        (lambda (c) (or (<= ?0 c ?7)
+                                        (memq c '(?c ?p ?q ?s))))
+                        (string-to-list targets)))))
          (while (and (not str) (< n (length targets)))
            (setq
             str
@@ -2640,22 +2648,17 @@ DATA is the selection data encoded in base64."
                 eat--t-term :select t))
               ;; 0 to 9 targets are handled by us, and always work.
               ((and (pred (<= ?0))
-                    (pred (>= ?9))
+                    (pred (>= ?7))
                     i)
                (aref (eat--t-term-cut-buffers eat--t-term)
                      (- i ?0)))))
-           ;; If we got a string to send, record the source to inform
-           ;; the client.
-           (when str
-             (setq source (string (aref targets n))))
            (cl-incf n))
-         ;; No string to send, so send an empty string and an empty
-         ;; target string meaning that we don't have any answer.
-         (unless str
-           (setq str "")
-           (setq source ""))
-         (format "\e]52;%s;%s\e\\" source
-                 (base64-encode-string str))))
+         ;; No string to send, so send an empty string.
+         (unless str (setq str ""))
+         (format "\e]52;%s;%s\e\\" targets
+                 (base64-encode-string (encode-coding-string
+                                        str locale-coding-system)
+                                       'no-line-break))))
     ;; The client is requesting to set clipboard content, let's try to
     ;; fulfill the request.
     (let ((str (ignore-errors
@@ -2677,9 +2680,9 @@ DATA is the selection data encoded in base64."
           (?s
            (funcall (eat--t-term-manipulate-selection-fn eat--t-term)
                     eat--t-term :select str))
-          ;; 0 to 9 targets are handled by us, and always work.
+          ;; 0 to 7 targets are handled by us, and always work.
           ((and (pred (<= ?0))
-                (pred (>= ?9))
+                (pred (>= ?7))
                 i)
            (aset (eat--t-term-cut-buffers eat--t-term) (- i ?0)
                  str)))))))
@@ -3206,8 +3209,7 @@ DATA is the selection data encoded in base64."
                       ;; OSC 5 2 ; <t> ; <s> ST.
                       ((rx string-start "52;"
                            (let targets
-                             (zero-or-more (any ?c ?p ?q ?s
-                                                (?0 . ?9))))
+                             (zero-or-more (not ?\;)))
                            ?\; (let data (zero-or-more anything))
                            string-end)
                        (eat--t-manipulate-selection
@@ -3578,7 +3580,7 @@ should not change point and buffer restriction.
 
 To set it, use (`setf' (`eat-term-ring-bell-function' TERMINAL)
 FUNCTION), where FUNCTION is the function to ring the bell."
-  (eat--t-term-manipulate-selection-fn terminal))
+  (eat--t-term-bell-fn terminal))
 
 (gv-define-setter eat-term-ring-bell-function (function terminal)
   `(setf (eat--t-term-bell-fn ,terminal) ,function))
@@ -4560,6 +4562,9 @@ selection, or nil if none."
        (when eat-enable-yank-to-terminal
          (ignore-error error
            (current-kill 0 'do-not-move))))
+      ('nil
+       (when eat-enable-kill-from-terminal
+         (kill-new "")))
       ((and (pred stringp) str)
        (when eat-enable-kill-from-terminal
          (kill-new str))))))
