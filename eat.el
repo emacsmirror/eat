@@ -5555,12 +5555,17 @@ With a numeric prefix ARG (like \\[universal-argument] 42 \\[eshell]),
 switch to the session with that number, or create it if it doesn't
 already exist.
 
+With double prefix argument ARG, ask for the program to run and run it
+in a newly created session.
+
 PROGRAM can be a shell command."
-  (interactive (list (read-shell-command "Run program: "
-                                         (or explicit-shell-file-name
-                                             (getenv "ESHELL")
-                                             shell-file-name))
-                     current-prefix-arg))
+  (interactive
+   (list (when (equal current-prefix-arg '(16))
+           (read-shell-command "Run program: "
+                               (or explicit-shell-file-name
+                                   (getenv "ESHELL")
+                                   shell-file-name)))
+         current-prefix-arg))
   (let ((program (or program (or explicit-shell-file-name
                                  (getenv "ESHELL")
                                  shell-file-name)))
