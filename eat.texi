@@ -2,7 +2,7 @@
 
 @comment %**start of header
 @setfilename eat.info
-@set UPDATED 28 March 2023
+@set UPDATED 29 March 2023
 @set VERSION 0.6.1
 @documentencoding UTF-8
 @codequotebacktick on
@@ -116,13 +116,10 @@ to run full screen programs like Emacs within the terminal.
 @chapter Hello Terminal
 
 @findex eat
-The terminal can be started with @kbd{M-x eat}.  It would prompt you
-for the program to run in the terminal, with a reasonable default
-value already filled in.  You can specify a program path, or a shell
-command.  After you hit @kbd{@key{RET}}, you will see a terminal, and
-the program you chose will be run within the terminal in the current
-directory.  You can interact with it.  If you started a shell, you
-should get a shell prompt and you should be able to write commands and
+The terminal can be started with @kbd{M-x eat}.  It'll create a
+terminal and run the default shell
+(@pxref{Interactive Shell,,, emacs, GNU Emacs Manual}) in it.  You
+should get a shell prompt and be able to write shell commands and
 execute them.  Full screen programs like @samp{htop}, @samp{lynx} and
 Emacs will work inside it, just like other any other terminal.
 
@@ -130,9 +127,14 @@ If an Eat terminal already exists, @kbd{M-x eat} will switch to it.
 To create a new terminal, call it with a prefix argument like this,
 @kbd{C-u M-x eat}.
 
-If you give it a numeric argument N, for example @kbd{C-u 42 M-x eat},
-it'll switch to a terminal in @file{*eat*<N>}, @file{*eat*<42>} for
-example, and it'll create a new terminal if that doesn't exist.
+If you give it a numeric prefix argument N, for example
+@kbd{C-u 42 M-x eat}, it'll switch to a terminal in the buffer
+@file{*eat*<N>}, @file{*eat*<42>} for example, or it'll create a new
+terminal if that buffer doesn't exist.
+
+If you give it double prefix argument, for example
+@kbd{C-u C-u M-x eat}, you'll be prompted for the program or shell
+command to run, and it'll be run in a newly created terminal.
 
 @node Project-local Terminal
 @cindex project-local terminal

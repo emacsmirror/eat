@@ -5551,7 +5551,7 @@ Return the buffer selected (or created).
 
 With a non-numeric prefix ARG, create a new session.
 
-With a numeric prefix ARG (like \\[universal-argument] 42 \\[eshell]),
+With a numeric prefix ARG (like \\[universal-argument] 42 \\[eat]),
 switch to the session with that number, or create it if it doesn't
 already exist.
 
@@ -6223,9 +6223,9 @@ Return the buffer selected (or created).
 
 With a non-numeric prefix ARG, create a new session.
 
-With a numeric prefix ARG (like \\[universal-argument] 42 \\[eshell]),
-switch to the session with that number, or create it if it doesn't
-already exist."
+With a numeric prefix ARG (like
+\\[universal-argument] 42 \\[eat-project]), switch to the session with
+that number, or create it if it doesn't already exist."
   (interactive "P")
   (require 'project)
   (let* ((default-directory (project-root (project-current t)))
