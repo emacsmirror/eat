@@ -38,7 +38,7 @@ pdf: eat.pdf
 terminfo: eat.ti
 	test -d terminfo || mkdir terminfo
 	env TERMINFO=./terminfo $(TIC) -x eat.ti
-# We don't know which directory was created, it depend on the
+# We don't know which directory was created, it depends on the
 # case-sensitivity of the file-system.  So make sure both are created.
 	test -d terminfo/e || mkdir terminfo/e
 	test -d terminfo/65 || mkdir terminfo/65

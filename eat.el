@@ -6637,6 +6637,40 @@ N defaults to 1.  Interactively, N is the prefix argument."
   (add-hook 'kill-buffer-hook #'eat-trace--cleanup nil t))
 
 
+;;;; Miscellaneous.
+
+(defun eat-compile-terminfo ()
+  "Compile terminfo databases of Eat."
+  (interactive)
+  ;; Check for required files and programs.
+  (let ((source-path (expand-file-name "eat.ti" eat--install-path))
+        (tic-path (executable-find "tic")))
+    (unless (file-exists-p source-path)
+      (error "Eat not installed properly: %s"
+             "Terminfo source file not found"))
+    (unless tic-path
+      (error "Terminfo compiler `tic' not found"))
+    (message "Compiling terminfo databases...")
+    ;; Compile.
+    (let* ((command (format "env TERMINFO=\"%s\" %s -x %s"
+                            eat-term-terminfo-directory tic-path
+                            source-path))
+           (status
+            (with-temp-buffer
+              (make-directory eat-term-terminfo-directory 'parents)
+              (let ((proc (start-process-shell-command
+                           "eat-terminfo-compile"
+                           (current-buffer) command)))
+                (while (process-live-p proc)
+                  (sleep-for 0.02))
+                (process-exit-status proc)))))
+      (if (= status 0)
+          (message "Compiling terminfo databases...done")
+        (message "Compiling terminfo databases...error")
+        (error "Command `%s' exited with non-zero exit code %i"
+               command status)))))
+
+
 ;;;; Footer.
 
 (defun eat-reload ()

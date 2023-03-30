@@ -121,7 +121,8 @@ terminal and run the default shell
 (@pxref{Interactive Shell,,, emacs, GNU Emacs Manual}) in it.  You
 should get a shell prompt and be able to write shell commands and
 execute them.  Full screen programs like @samp{htop}, @samp{lynx} and
-Emacs will work inside it, just like other any other terminal.
+Emacs will work inside it, just like other any other terminal.  (If
+the terminal doesn't work as expected, @pxref{Common Problems}.)
 
 If an Eat terminal already exists, @kbd{M-x eat} will switch to it.
 To create a new terminal, call it with a prefix argument like this,
@@ -939,22 +940,33 @@ Eat does something unexpected, such as hangs, garbled text, etc.
 @section Terminal Not Recognized
 
 If your program says that it can't recognize the terminal, probably
-the @env{TERM} environment has a wrong value.
+the @env{TERM} environment variable has a wrong value.
 
+@vindex eat-term-name
 Check the value of @env{TERM}, if it's not set to something like
 @samp{eat-...}, check the user option @code{eat-term-name}.  If that's
 correct that your shell might be changing the @env{TERM} environment
 variable.  If @code{eat-term-name} isn't correct, customize to a
 suitable value and try again, your problem should be fixed.
 
+@vindex eat-term-terminfo-directory
 If @env{TERM} has the correct value, then probably the Terminfo
-entries of Eat are missing.  This can happen if you manually install
-Eat.  Check that whether the values of the environment value
-@env{TERM} and the user option @code{eat-term-terminfo-directory}
-match.  If they match, customize @code{eat-term-terminfo-directory} to
-the directory that contains the Terminfo database, the program should
-now recognize Eat.  If they don't match, then your shell is probably
-responsible for the problem.
+databases of Eat are missing.  This can happen if you have installed
+Eat without using the package from NonGNU ELPA
+(@pxref{Packages,,, emacs, GNU Emacs Manual}).  Check that whether
+the values of the environment variable @env{TERMINFO} and the user
+option @code{eat-term-terminfo-directory} match.  If they match,
+customize @code{eat-term-terminfo-directory} to the directory
+containing the Terminfo databases, the program should now recognize
+Eat.  If they don't match, then your shell is probably responsible for
+the problem.
+
+@findex eat-compile-terminfo
+If you can't find the directory containing Terminfo databases, you can
+compile it yourself.  First, set @code{eat-term-terminfo-directory} to
+the directory where to put the Terminfo databases.  Then invoke the
+command @command{eat-compile-terminfo} to compile the Terminfo
+databases.
 
 @node Garbled Text
 @cindex garbled text
