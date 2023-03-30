@@ -374,13 +374,20 @@ Eat.  When shell integration is enabled and the script is loaded in
 your shell, it'll take care of everything and provide many useful
 features.
 
-Currently only GNU Bash is supported.
+Currently only GNU Bash and Zsh are supported.
 
 If you use GNU Bash, put the following in your @samp{.bashrc} file:
 
 @example
 [ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \
   source "$EAT_SHELL_INTEGRATION_DIR/bash"
+@end example
+
+If you use Zsh, put the following in your @samp{.zshrc} file:
+
+@example
+[ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \
+  source "$EAT_SHELL_INTEGRATION_DIR/zsh"
 @end example
 
 @cindex directory tracking
