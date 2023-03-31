@@ -3908,6 +3908,10 @@ client process may get confused."
            (send "\C-?"))
           ('C-backspace
            (send "\C-h"))
+          ('M-backspace
+           (send "\e\C-?"))
+          ('C-M-backspace
+           (send "\e\C-h"))
           ;; Function keys.
           ((and (pred symbolp)
                 fn-key
@@ -4193,6 +4197,7 @@ EXCEPTIONS is a list of key sequences to not bind.  Don't use
         ;; Bind `backspace', `delete', `deletechar', and all modified
         ;; variants.
         (dolist (key '( backspace C-backspace
+                        M-backspace C-M-backspace
                         insert C-insert M-insert S-insert C-M-insert
                         C-S-insert M-S-insert C-M-S-insert
                         delete C-delete M-delete S-delete C-M-delete
