@@ -1,6 +1,6 @@
-# integration/bash --- Bash integration
+# integration/zsh --- Zsh integration
 
-# Copyright (C) 2022 Akib Azmain Turja.
+# Copyright (C) 2022, 2023 Akib Azmain Turja.
 
 # This file is not part of GNU Emacs.
 
@@ -26,7 +26,7 @@ __eat_precmd () {
   fi
   __eat_current_command=""
   # Send the current working directory, for directory tracking.
-  printf '\e]51;e;A;%s;%s\e\\' "$(printf "%s" "$HOSTNAME" | base64)" \
+  printf '\e]51;e;A;%s;%s\e\\' "$(printf "%s" "$HOST" | base64)" \
          "$(printf "%s" "$PWD" | base64)"
   # Update title.
   # "${PWD/$HOME/'~'}" converts "/home/akib/org/" to "~/org/".
