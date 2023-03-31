@@ -969,6 +969,12 @@ Eat.  If they don't match, then your shell is probably responsible for
 the problem.
 
 @findex eat-compile-terminfo
+If the program is not recognizing the terminal even when
+the correct directory is set as @code{eat-term-terminfo-directory},
+probably the precompiled Terminfo databases aren't working properly on
+your system.  You can invoke the command
+@command{eat-compile-terminfo} to recompile it for your system.
+
 If you can't find the directory containing Terminfo databases, you can
 compile it yourself.  First, set @code{eat-term-terminfo-directory} to
 the directory where to put the Terminfo databases.  Then invoke the
@@ -990,12 +996,16 @@ program doesn't recognize Eat, and it stays silent instead of
 reporting that.
 
 If the problem isn't resolved after following the instructions in the
-previous section, may be your program is blindly assuming that the
-terminal is XTerm-compatible.  If so, what you are seeing is the
-current state of ``XTerm-compliance''.  Though it's not really a bug,
-we definite want to know what's problem so that we can fix it.
-@xref{Reporting Bugs} for instructions on sending bug reports or
-feature request.
+previous section, probably the precompiled Terminfo databases aren't
+working properly on your system.  Running the command
+@command{eat-compile-terminfo} will recompile it for your system.
+
+If the problem still persists, may be your program is blindly assuming
+that the terminal is XTerm-compatible.  If so, what you are seeing is
+the current state of ``XTerm-compliance''.  Though it's not really a
+bug, we really want to know what's problem so that we can fix it and
+improve XTerm-compliance.  @xref{Reporting Bugs} for instructions on
+sending bug reports or feature request.
 
 The other potential reason is that Eat is not working.  This is
 definitely a bug, so please report it.
