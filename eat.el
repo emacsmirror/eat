@@ -376,9 +376,8 @@ prompt annotation."
       ,cur-type))
   "Custom type specification for Eat's cursor type variables.")
 
-(defcustom eat-default-cursor-type
-  `(,(default-value 'cursor-type) nil nil)
-  "Cursor to use in Eat buffer.
+(defcustom eat-invisible-cursor-type '(nil nil nil)
+  "Type of cursor to use as invisible cursor in Eat buffer.
 
 The value is a list of form (CURSOR-ON BLINKING-FREQUENCY CURSOR-OFF).
 
@@ -390,8 +389,9 @@ should be nil when cursor is not blinking."
   :group 'eat-ui
   :group 'eat-eshell)
 
-(defcustom eat-invisible-cursor-type '(nil nil nil)
-  "Invisible cursor to use in Eat buffer.
+(defcustom eat-default-cursor-type
+  `(,(default-value 'cursor-type) nil nil)
+  "Cursor to use in Eat buffer.
 
 The value is a list of form (CURSOR-ON BLINKING-FREQUENCY CURSOR-OFF).
 
@@ -407,9 +407,64 @@ should be nil when cursor is not blinking."
   `(,(default-value 'cursor-type) 2 hollow)
   "Very visible cursor to use in Eat buffer.
 
-When the cursor is invisible, the car of the value is used as
-`cursor-type', which see.  The cdr of the value, when non-nil, is the
-blinking frequency of cursor."
+The value is a list of form (CURSOR-ON BLINKING-FREQUENCY CURSOR-OFF).
+
+When the cursor is on, CURSOR-ON is used as `cursor-type', which see.
+BLINKING-FREQUENCY is the blinking frequency of cursor's blinking.
+When the cursor is off, CURSOR-OFF is used as `cursor-type'.  This
+should be nil when cursor is not blinking."
+  :type eat--cursor-type-value-type
+  :group 'eat-ui
+  :group 'eat-eshell)
+
+(defcustom eat-vertical-bar-cursor-type '(bar nil nil)
+  "Vertical bar cursor to use in Eat buffer.
+
+The value is a list of form (CURSOR-ON BLINKING-FREQUENCY CURSOR-OFF).
+
+When the cursor is on, CURSOR-ON is used as `cursor-type', which see.
+BLINKING-FREQUENCY is the blinking frequency of cursor's blinking.
+When the cursor is off, CURSOR-OFF is used as `cursor-type'.  This
+should be nil when cursor is not blinking."
+  :type eat--cursor-type-value-type
+  :group 'eat-ui
+  :group 'eat-eshell)
+
+(defcustom eat-very-visible-vertical-bar-cursor-type '(bar 2 nil)
+  "Very visible vertical bar cursor to use in Eat buffer.
+
+The value is a list of form (CURSOR-ON BLINKING-FREQUENCY CURSOR-OFF).
+
+When the cursor is on, CURSOR-ON is used as `cursor-type', which see.
+BLINKING-FREQUENCY is the blinking frequency of cursor's blinking.
+When the cursor is off, CURSOR-OFF is used as `cursor-type'.  This
+should be nil when cursor is not blinking."
+  :type eat--cursor-type-value-type
+  :group 'eat-ui
+  :group 'eat-eshell)
+
+(defcustom eat-horizontal-bar-cursor-type '(hbar nil nil)
+  "Horizontal bar cursor to use in Eat buffer.
+
+The value is a list of form (CURSOR-ON BLINKING-FREQUENCY CURSOR-OFF).
+
+When the cursor is on, CURSOR-ON is used as `cursor-type', which see.
+BLINKING-FREQUENCY is the blinking frequency of cursor's blinking.
+When the cursor is off, CURSOR-OFF is used as `cursor-type'.  This
+should be nil when cursor is not blinking."
+  :type eat--cursor-type-value-type
+  :group 'eat-ui
+  :group 'eat-eshell)
+
+(defcustom eat-very-visible-horizontal-bar-cursor-type '(hbar 2 nil)
+  "Very visible horizontal bar cursor to use in Eat buffer.
+
+The value is a list of form (CURSOR-ON BLINKING-FREQUENCY CURSOR-OFF).
+
+When the cursor is on, CURSOR-ON is used as `cursor-type', which see.
+BLINKING-FREQUENCY is the blinking frequency of cursor's blinking.
+When the cursor is off, CURSOR-OFF is used as `cursor-type'.  This
+should be nil when cursor is not blinking."
   :type eat--cursor-type-value-type
   :group 'eat-ui
   :group 'eat-eshell)
@@ -964,8 +1019,8 @@ Nil when not in alternative display mode.")
                       (g2 . us-ascii)
                       (g3 . us-ascii))))
    :documentation "Current character set.")
-  (cur-state :default :documentation "Current state of cursor.")
-  (cur-blinking-p nil :documentation "Is the cursor blinking?")
+  (cur-state :block :documentation "Current state of cursor.")
+  (cur-visible-p t :documentation "Is the cursor visible?")
   (saved-face
    (1value (eat--t-make-face))
    :documentation "Saved SGR attributes.")
@@ -1047,8 +1102,8 @@ Don't `set' it, bind it to a value with `let'.")
                (g3 . dec-line-drawing)))
     (setf (eat--t-term-saved-face eat--t-term) (eat--t-make-face))
     (setf (eat--t-term-bracketed-yank eat--t-term) nil)
-    (setf (eat--t-term-cur-state eat--t-term) :default)
-    (setf (eat--t-term-cur-blinking-p eat--t-term) nil)
+    (setf (eat--t-term-cur-state eat--t-term) :block)
+    (setf (eat--t-term-cur-visible-p eat--t-term) t)
     (setf (eat--t-term-title eat--t-term) "")
     (setf (eat--t-term-keypad-mode eat--t-term) nil)
     (setf (eat--t-term-mouse-mode eat--t-term) nil)
@@ -1062,7 +1117,7 @@ Don't `set' it, bind it to a value with `let'.")
              eat--t-term nil)
     (funcall (eat--t-term-set-title-fn eat--t-term) eat--t-term "")
     (funcall (eat--t-term-set-cursor-fn eat--t-term) eat--t-term
-             :default)))
+             :block)))
 
 (defun eat--t-cur-right (&optional n)
   "Move cursor N columns right.
@@ -1893,36 +1948,64 @@ to (1, 1).  When N is 3, also erase the scrollback."
 (defun eat--t-set-cursor-state (state)
   "Set cursor state to STATE.
 
-STATE one of the `:default', `:invisible', `:very-visible'."
-  (unless (eq (eat--t-term-cur-state eat--t-term) state)
-    ;; Update state.
-    (setf (eat--t-term-cur-state eat--t-term) state)
-    ;; Inform the UI.
-    (funcall (eat--t-term-set-cursor-fn eat--t-term) eat--t-term
-             state)))
+STATE one of the `:invisible', `:block', `:blinking-block',
+`:underline', `:blinking-underline', `:bar', `:blinking-bar'."
+  (if (eq state :invisible)
+      (when (eat--t-term-cur-visible-p eat--t-term)
+        (setf (eat--t-term-cur-visible-p eat--t-term) nil)
+        (funcall (eat--t-term-set-cursor-fn eat--t-term) eat--t-term
+                 :invisible))
+    (unless (and (eat--t-term-cur-visible-p eat--t-term)
+                 (eq (eat--t-term-cur-state eat--t-term) state))
+      ;; Update state.
+      (setf (eat--t-term-cur-state eat--t-term) state)
+      (setf (eat--t-term-cur-visible-p eat--t-term) t)
+      ;; Inform the UI.
+      (funcall (eat--t-term-set-cursor-fn eat--t-term) eat--t-term
+               state))))
 
-(defun eat--t-default-cursor ()
-  "Set the cursor to its default state."
-  (eat--t-set-cursor-state
-   (if (eat--t-term-cur-blinking-p eat--t-term)
-       :very-visible
-     :default)))
+(defun eat--t-set-cursor-style (style)
+  "Set cursor state as described by STYLE."
+  (when (<= 0 style 6)
+    (let ((state (aref [ :blinking-block :blinking-block :block
+                         :blinking-underline :underline
+                         :blinking-bar :bar]
+                       style)))
+      (if (eat--t-term-cur-visible-p eat--t-term)
+          (eat--t-set-cursor-state state)
+        (setf (eat--t-term-cur-state eat--t-term) state)))))
 
-(defun eat--t-invisible-cursor ()
+(defun eat--t-show-cursor ()
+  "Make the cursor visible."
+  (when (not (eat--t-term-cur-visible-p eat--t-term))
+    (eat--t-set-cursor-state (eat--t-term-cur-state eat--t-term))))
+
+(defun eat--t-hide-cursor ()
   "Make the cursor invisible."
-  (eat--t-set-cursor-state :invisible))
+  (when (eat--t-term-cur-visible-p eat--t-term)
+    (eat--t-set-cursor-state :invisible)))
 
 (defun eat--t-blinking-cursor ()
   "Make the cursor blink."
-  (setf (eat--t-term-cur-blinking-p eat--t-term) t)
-  (when (eq (eat--t-term-cur-state eat--t-term) :default)
-    (eat--t-set-cursor-state :very-visible)))
+  (let ((state (pcase (eat--t-term-cur-state eat--t-term)
+                 (:block :blinking-block)
+                 (:underline :blinking-underline)
+                 (:bar :blinking-bar)
+                 (state state))))
+    (if (eat--t-term-cur-visible-p eat--t-term)
+        (eat--t-set-cursor-state state)
+      (setf (eat--t-term-cur-state eat--t-term) state))))
 
 (defun eat--t-non-blinking-cursor ()
   "Make the cursor not blink."
-  (setf (eat--t-term-cur-blinking-p eat--t-term) nil)
-  (when (eq (eat--t-term-cur-state eat--t-term) :very-visible)
-    (eat--t-set-cursor-state :default)))
+  (let ((state (pcase (eat--t-term-cur-state eat--t-term)
+                 (:blinking-block :block)
+                 (:blinking-underline :underline)
+                 (:blinking-bar :bar)
+                 (state state))))
+    (if (eat--t-term-cur-visible-p eat--t-term)
+        (eat--t-set-cursor-state state)
+      (setf (eat--t-term-cur-state eat--t-term) state))))
 
 (defun eat--t-enable-bracketed-yank ()
   "Enable bracketed yank mode."
@@ -2741,7 +2824,7 @@ is the selection data encoded in base64."
          ('(12)
           (eat--t-blinking-cursor))
          ('(25)
-          (eat--t-default-cursor))
+          (eat--t-show-cursor))
          ('(1000)
           (eat--t-enable-normal-mouse))
          ('(1002)
@@ -2778,7 +2861,7 @@ is the selection data encoded in base64."
          ('(12)
           (eat--t-non-blinking-cursor))
          ('(25)
-          (eat--t-invisible-cursor))
+          (eat--t-hide-cursor))
          (`(,(or 9 1000 1002 1003))
           (eat--t-disable-mouse))
          ('(1004)
@@ -3103,6 +3186,9 @@ is the selection data encoded in base64."
                  ;; CSI 6 n.
                  ('((?n) nil ((6)))
                   (eat--t-device-status-report))
+                 ;; CSI <n> SP q.
+                 (`((?q ?\ ) nil ((,n)))
+                  (eat--t-set-cursor-style n))
                  ;; CSI <n> ; <n> r.
                  (`((?r) nil ,(and (pred listp) params))
                   (eat--t-change-scroll-region (caadr params)
@@ -3479,10 +3565,16 @@ where FUNCTION is the input function."
 
 The return value can be one of the following:
 
-  `:default'            Default cursor.
   `:invisible'          Invisible cursor.
-  `:very-visible'       Very visible cursor."
-  (eat--t-term-cur-state terminal))
+  `:block'              Block (filled box) cursor (default).
+  `:blinking-block'     Blinking block cursor.
+  `:bar'                Vertical bar cursor.
+  `:blinking-bar'       Blinking vertical bar cursor.
+  `:underline'          Horizontal bar cursor.
+  `:blinking-underline' Blinking horizontal bar cursor."
+  (if (eat--t-term-cur-visible-p terminal)
+      (eat--t-term-cur-state terminal)
+    :invisible))
 
 (defun eat-term-set-cursor-function (terminal)
   "Return the function used to set the cursor of TERMINAL.
@@ -3491,14 +3583,17 @@ The function is called with two arguments, TERMINAL and a symbol STATE
 describing the new state of cursor.  The function should not change
 point and buffer restriction.  STATE can be one of the following:
 
-  `:default'            Default cursor.
   `:invisible'          Invisible cursor.
-  `:very-visible'       Very visible cursor.  Can also be implemented
-                        as blinking cursor.
+  `:block'              Block (filled box) cursor (default).
+  `:blinking-block'     Blinking block cursor.
+  `:bar'                Vertical bar cursor.
+  `:blinking-bar'       Blinking vertical bar cursor.
+  `:underline'          Horizontal bar cursor.
+  `:blinking-underline' Blinking horizontal bar cursor.
 
 More possible values might be added in future.  So in case the
 function doesn't know about a particular cursor state, it should reset
-the cursor to the default like the `:default' state.
+the cursor to the default like the `:block' state.
 
 To set it, use (`setf' (`eat-term-set-cursor-function' TERMINAL)
 FUNCTION), where FUNCTION is the function to set cursor."
@@ -4495,6 +4590,8 @@ return \"eat-color\", otherwise return \"eat-mono\"."
                 t)
       (add-hook 'post-command-hook #'eat--cursor-blink-start-timers
                 nil t)
+      (add-hook 'kill-buffer-hook #'eat--cursor-blink-stop-timers nil
+                t)
       (when (current-idle-time)
         (eat--cursor-blink-start-timers)))
      (t
@@ -4502,6 +4599,8 @@ return \"eat-color\", otherwise return \"eat-mono\"."
       (remove-hook 'pre-command-hook #'eat--cursor-blink-stop-timers
                    t)
       (remove-hook 'post-command-hook #'eat--cursor-blink-start-timers
+                   t)
+      (remove-hook 'kill-buffer-hook #'eat--cursor-blink-stop-timers
                    t)
       (mapc #'kill-local-variable locals)))))
 
@@ -4539,18 +4638,29 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 
 STATE can be one of the following:
 
-`:default'            Default cursor.
-`:invisible'          Invisible cursor.
-`:very-visible'       Very visible cursor.  Can also be implemented as
-                      blinking cursor.
-Any other value     Default cursor."
-  (setq-local eat--cursor-blink-type
-              (pcase state
-                (:invisible eat-invisible-cursor-type)
-                (:very-visible eat-very-visible-cursor-type)
-                (_ eat-default-cursor-type))) ; `:default'
+  `:invisible'          Invisible cursor.
+  `:block'              Block (filled box) cursor (default).
+  `:blinking-block'     Blinking block cursor.
+  `:bar'                Vertical bar cursor.
+  `:blinking-bar'       Blinking vertical bar cursor.
+  `:underline'          Horizontal bar cursor.
+  `:blinking-underline' Blinking horizontal bar cursor.
+  Any other value         Block cursor."
+  (setq-local
+   eat--cursor-blink-type
+   (pcase state
+     (:invisible eat-invisible-cursor-type)
+     (:block eat-default-cursor-type)
+     (:blinking-block eat-very-visible-cursor-type)
+     (:bar eat-vertical-bar-cursor-type)
+     (:blinking-bar eat-very-visible-vertical-bar-cursor-type)
+     (:underline eat-horizontal-bar-cursor-type)
+     (:blinking-underline eat-very-visible-horizontal-bar-cursor-type)
+     (_ eat-default-cursor-type)))
   (setq-local cursor-type (car eat--cursor-blink-type))
-  (eat--cursor-blink-mode (if (cadr eat--cursor-blink-type) +1 -1)))
+  (when (xor (cadr eat--cursor-blink-type) eat--cursor-blink-mode)
+    (eat--cursor-blink-mode
+     (if (cadr eat--cursor-blink-type) +1 -1))))
 
 (defun eat--manipulate-kill-ring (_ selection data)
   "Manipulate `kill-ring'.

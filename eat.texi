@@ -2,7 +2,7 @@
 
 @comment %**start of header
 @setfilename eat.info
-@set UPDATED 29 March 2023
+@set UPDATED 31 March 2023
 @set VERSION 0.6.1
 @documentencoding UTF-8
 @codequotebacktick on
@@ -562,23 +562,45 @@ types of cursor.  Each of the user options share the same format.
 
 @vindex eat-default-cursor-type
 @defopt eat-default-cursor-type
-This control the cursor shape of ``visible'' cursor type.
+This controls the cursor shape of the ``visible'' cursor type.
 @end defopt
 
 @vindex eat-invisible-cursor-type
 @defopt eat-invisible-cursor-type
-This control the cursor shape of ``invisible'' cursor type.
+This controls the cursor shape of the ``invisible'' cursor type.
 @end defopt
 
 @vindex eat-very-visible-cursor-type
 @defopt eat-very-visible-cursor-type
-This control the cursor shape of ``very visible'' cursor type.  This
-cursor blinks, switching between the default cursor shape and a hollow
-box.
+This controls the cursor shape of the ``very visible'' cursor type.
+This cursor blinks, switching between the default cursor shape and a
+hollow box.
 @end defopt
 
-The value type of these user options is a list.  The list is of form
-(@var{cursor-on} @var{blinking-frequency} @var{cursor-off}).
+@vindex eat-vertical-bar-cursor-type
+@defopt eat-vertical-bar-cursor-type
+This controls the cursor shape of the ``vertical bar'' cursor type.
+@end defopt
+
+@vindex eat-very-visible-vertical-bar-cursor-type
+@defopt eat-very-visible-vertical-bar-cursor-type
+This controls the cursor shape of the ``very visible vertical bar''
+cursor type.  This cursor blinks.
+@end defopt
+
+@vindex eat-horizontal-bar-cursor-type
+@defopt eat-horizontal-bar-cursor-type
+This controls the cursor shape of the ``horizontal bar'' cursor type.
+@end defopt
+
+@vindex eat-very-visible-horizontal-bar-cursor-type
+@defopt eat-very-visible-horizontal-bar-cursor-type
+This controls the cursor shape of the ``very visible horizontal bar''
+cursor type.  This cursor blinks.
+@end defopt
+
+The value type of all these user options is a list.  The list is of
+form (@var{cursor-on} @var{blinking-frequency} @var{cursor-off}).
 @var{blinking-frequency} is the frequency of blinking of cursor.  It
 is a number, controlling how many times the cursor will blink a
 second.  This can also be @code{nil}, this will disable cursor
