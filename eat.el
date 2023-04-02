@@ -5288,6 +5288,7 @@ END if it's safe to do so."
   (setq eat--synchronize-scroll-function #'eat--synchronize-scroll)
   (setq filter-buffer-substring-function
         #'eat--filter-buffer-substring)
+  (setq bidi-paragraph-direction 'left-to-right)
   (setq eat--mouse-grabbing-type nil)
   (setq mode-line-process
         '(""
