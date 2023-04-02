@@ -2,7 +2,7 @@
 
 @comment %**start of header
 @setfilename eat.info
-@set UPDATED 31 March 2023
+@set UPDATED 02 April 2023
 @set VERSION 0.6.1
 @documentencoding UTF-8
 @codequotebacktick on
@@ -252,7 +252,8 @@ applications.
 ``Semi-char mode'' is the default input mode of Eat.  This works for
 most inputs.  It forwards all keys, except @kbd{C-\}, @kbd{C-c},
 @kbd{C-x}, @kbd{C-g}, @kbd{C-h}, @kbd{C-M-c}, @kbd{C-u}, @kbd{M-x},
-@kbd{C-q}, @kbd{M-:}, @kbd{M-!} and @kbd{M-&}, Emacs handle them.
+@kbd{C-q}, @kbd{M-:}, @kbd{M-!}, @kbd{M-&} and some other keys, Emacs
+handles them.
 
 @cindex inputting exceptional characters
 @kindex C-q @r{(``semi-char mode'')}
@@ -295,7 +296,8 @@ Both user options contain a list of keys of form @code{[@var{key}]},
 where @var{key} is a key not to bind.  @var{key} mustn't contain meta
 modifier.  To not bind a key with meta modifier, use a vector of form
 @code{[?\e @var{key}]}, where @var{key} is the key without meta
-modifier.
+modifier.  These user options contain all the ``semi-char'' mode
+exceptions listed above, plus some more exceptions.
 
 @findex eat-update-semi-char-mode-map
 @findex eat-eshell-update-semi-char-mode-map
