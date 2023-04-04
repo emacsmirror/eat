@@ -51,7 +51,9 @@
 
 ;;   * "semi-char" mode: Most keys are bound to send the key to the
 ;;     terminal, except the following keys: `C-\', `C-c', `C-x',
-;;     `C-g', `C-h', `C-M-c', `C-u', `M-x', `M-:', `M-!', `M-&'.  The
+;;     `C-g', `C-h', `C-M-c', `C-u', `M-x', `M-:', `M-!', `M-&' and
+;;     some other keys (see the user option
+;;     `eat-semi-char-non-bound-keys' for the complete list).  The
 ;;     following special keybinding are available:
 
 ;;       * `C-q': Send next key to the terminal.
