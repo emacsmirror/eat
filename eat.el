@@ -351,8 +351,28 @@ prompt annotation."
   :type 'hook
   :group 'eat-ui)
 
+(defcustom eat-update-hook nil
+  "Hook run after the terminal in a Eat buffer is updated."
+  :type 'hook
+  :group 'eat-ui)
+
+(defcustom eat-exit-hook nil
+  "Hook run after the command executed by `eat' exits."
+  :type 'hook
+  :group 'eat-ui)
+
 (defcustom eat-eshell-exec-hook nil
-  "Hook run after `eat' executes a commamnd."
+  "Hook run after a terminal is created in Eshell."
+  :type 'hook
+  :group 'eat-eshell)
+
+(defcustom eat-eshell-update-hook nil
+  "Hook run after the terminal in a Eshell buffer is updated."
+  :type 'hook
+  :group 'eat-eshell)
+
+(defcustom eat-eshell-exit-hook nil
+  "Hook run after the terminal in Eshell is deleted."
   :type 'hook
   :group 'eat-eshell)
 
@@ -4636,7 +4656,8 @@ return \"eat-color\", otherwise return \"eat-mono\"."
   (when eat--terminal
     (let ((inhibit-read-only t))
       (eat-term-reset eat--terminal)
-      (eat-term-redisplay eat--terminal))))
+      (eat-term-redisplay eat--terminal))
+    (run-hooks 'eat-update-hook)))
 
 (defun eat--set-cursor (_ state)
   "Set cursor type according to STATE.
@@ -5456,7 +5477,8 @@ OS's."
                eat-shell-prompt-annotation-correction-delay
                nil #'eat--correct-shell-prompt-mark-overlays
                buffer))
-        (funcall eat--synchronize-scroll-function sync-windows)))))
+        (funcall eat--synchronize-scroll-function sync-windows))
+      (run-hooks 'eat-update-hook))))
 
 (defun eat--filter (process output)
   "Handle OUTPUT from PROCESS."
@@ -5489,35 +5511,34 @@ to it."
   (let ((buffer (process-buffer process)))
     (when (memq (process-status process) '(signal exit))
       (if (buffer-live-p buffer)
-          (if eat-kill-buffer-on-exit
-              (kill-buffer buffer)
-            (with-current-buffer buffer
-              (let ((inhibit-read-only t))
-                (when eat--process-output-queue-timer
-                  (cancel-timer eat--process-output-queue-timer)
-                  (setq eat--process-output-queue-timer nil))
-                (eat--process-output-queue buffer)
-                (when eat--shell-prompt-annotation-correction-timer
-                  (cancel-timer
-                   eat--shell-prompt-annotation-correction-timer)
-                  (setq eat--shell-prompt-annotation-correction-timer
-                        nil))
-                (when eat-enable-shell-prompt-annotation
-                  (eat--correct-shell-prompt-mark-overlays buffer)
-                  (setq eat--shell-command-status 0)
-                  (setq eat--shell-prompt-begin nil)
-                  (setq eat--shell-prompt-mark nil)
-                  (setq eat--shell-prompt-mark-overlays nil))
-                (eat-emacs-mode)
-                (delete-process process)
-                (eat-term-delete eat--terminal)
-                (setq eat--terminal nil)
-                (eat--set-cursor nil :default)
-                (eat--grab-mouse nil nil)
-                (goto-char (point-max))
-                (insert "\nProcess " (process-name process) " "
-                        message)
-                (setq buffer-read-only nil))))
+          (with-current-buffer buffer
+            (let ((inhibit-read-only t))
+              (when eat--process-output-queue-timer
+                (cancel-timer eat--process-output-queue-timer)
+                (setq eat--process-output-queue-timer nil))
+              (eat--process-output-queue buffer)
+              (when eat--shell-prompt-annotation-correction-timer
+                (cancel-timer
+                 eat--shell-prompt-annotation-correction-timer)
+                (setq eat--shell-prompt-annotation-correction-timer
+                      nil))
+              (when eat-enable-shell-prompt-annotation
+                (eat--correct-shell-prompt-mark-overlays buffer)
+                (setq eat--shell-command-status 0)
+                (setq eat--shell-prompt-begin nil)
+                (setq eat--shell-prompt-mark nil)
+                (setq eat--shell-prompt-mark-overlays nil))
+              (eat-emacs-mode)
+              (delete-process process)
+              (eat-term-delete eat--terminal)
+              (setq eat--terminal nil)
+              (eat--set-cursor nil :default)
+              (eat--grab-mouse nil nil)
+              (goto-char (point-max))
+              (insert "\nProcess " (process-name process) " "
+                      message)
+              (setq buffer-read-only nil))
+            (run-hooks 'eat-exit-hook))
         (set-process-buffer process nil)))))
 
 (defun eat--adjust-process-window-size (process windows)
@@ -5534,7 +5555,12 @@ of window displaying PROCESS's buffer."
             (sync-windows (eat--synchronize-scroll-windows)))
         (eat-term-resize eat--terminal width height)
         (eat-term-redisplay eat--terminal)
-        (funcall eat--synchronize-scroll-function sync-windows)))
+        (funcall eat--synchronize-scroll-function sync-windows))
+      (pcase major-mode
+        ('eat-mode
+         (run-hooks 'eat-update-hook))
+        ('eshell-mode
+         (run-hooks 'eat-eshell-update-hook))))
     size))
 
 ;; Adapted from Term.
@@ -5547,11 +5573,11 @@ mode.  You can use this to cheaply run a series of processes in the
 same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
   (with-current-buffer buffer
     (let ((inhibit-read-only t))
-      (when-let*
-          ((eat--terminal)
-           (proc (eat-term-parameter eat--terminal 'eat--process)))
-        (let ((eat-kill-buffer-on-exit nil))
-          (delete-process proc)))
+      (when-let* ((eat--terminal)
+                  (proc (eat-term-parameter
+                         eat--terminal 'eat--process)))
+        (remove-hook 'eat-exit-hook #'kill-buffer t)
+        (delete-process proc))
       ;; Ensure final newline.
       (goto-char (point-max))
       (unless (or (= (point-min) (point-max))
@@ -5624,6 +5650,8 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
               process)
         (setf (eat-term-parameter eat--terminal 'eat--output-process)
               process)
+        (when eat-kill-buffer-on-exit
+          (add-hook 'eat-exit-hook #'kill-buffer 90 t))
         ;; Feed it the startfile.
         (when startfile
           ;; This is guaranteed to wait long enough
@@ -5636,9 +5664,9 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
           (insert-file-contents startfile)
           (process-send-string
            process (delete-and-extract-region (point) (point-max)))))
-      (eat-term-redisplay eat--terminal)
-      (run-hooks 'eat-exec-hook)
-      buffer)))
+      (eat-term-redisplay eat--terminal))
+    (run-hooks 'eat-exec-hook)
+    buffer))
 
 
 ;;;;; Entry Points.
@@ -5857,7 +5885,8 @@ PROGRAM can be a shell command."
       (set-marker eshell-last-output-end end)
       (set-marker (process-mark (eat-term-parameter
                                  eat--terminal 'eat--output-process))
-                  end))))
+                  end)))
+  (run-hooks 'eat-eshell-update-hook))
 
 (defun eat--eshell-setup-proc-and-term (proc)
   "Setup process PROC and a new terminal for it."
@@ -5916,7 +5945,8 @@ PROGRAM can be a shell command."
       (eat--eshell-semi-char-mode -1)
       (eat--eshell-char-mode -1)
       (eat--eshell-process-running-mode -1)
-      (setq buffer-read-only nil))))
+      (setq buffer-read-only nil))
+    (run-hooks 'eat-eshell-exit-hook)))
 
 (declare-function eshell-output-filter "esh-mode" (process string))
 
