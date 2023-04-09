@@ -26,7 +26,7 @@
 
 ;;; Commentary:
 
-;; Eat's name self-explainary, it stands for "Emulate A Terminal".
+;; Eat's name self-explanatory, it stands for "Emulate A Terminal".
 ;; Eat is a terminal emulator.  It can run most (if not all)
 ;; full-screen terminal programs, including Emacs.
 
@@ -4769,7 +4769,11 @@ If HOST isn't the host Emacs is running on, don't do anything."
             (push ov eat--shell-prompt-mark-overlays))))))
   (when eat--shell-prompt-begin
     (when (< eat--shell-prompt-begin (point))
-      ;; Put a text property to allow previous or next prompts.
+      ;; Put a text property for `eat-narrow-to-shell-prompt'.
+      (put-text-property eat--shell-prompt-begin
+                         (1+ eat--shell-prompt-begin)
+                         'eat--shell-prompt-begin t)
+      ;; Put a text property to allow shell prompt navigation.
       (put-text-property (1- (point)) (point)
                          'eat--shell-prompt-end t)))
   (setq eat--shell-prompt-begin nil))
@@ -4785,23 +4789,27 @@ BUFFER is the terminal buffer."
       (while-no-input
         ;; Delete all outdated overlays.
         (dolist (ov eat--shell-prompt-mark-overlays)
-          (unless (eq (overlay-get ov 'eat--shell-prompt-mark-id)
-                      (get-text-property (overlay-start ov)
-                                         'eat--shell-prompt-mark-id))
+          (unless (and (<= (point-min) (overlay-start ov)
+                           (1- (point-max)))
+                       (eq (overlay-get ov 'eat--shell-prompt-mark-id)
+                           (get-text-property
+                            (overlay-start ov)
+                            'eat--shell-prompt-mark-id)))
             (delete-overlay ov)
             (setq eat--shell-prompt-mark-overlays
                   (delq ov eat--shell-prompt-mark-overlays))))
         (save-excursion
           ;; Recreate overlays if needed.
-          (goto-char (eat-term-beginning eat--terminal))
-          (while (< (point) (eat-term-end eat--terminal))
+          (goto-char (max (eat-term-beginning eat--terminal)
+                          (point-min)))
+          (while (< (point) (min (eat-term-end eat--terminal)
+                                 (point-max)))
             (when (get-text-property
                    (point) 'eat--shell-prompt-mark-id)
               (let ((ov (get-text-property
                          (point) 'eat--shell-prompt-mark-overlay)))
-                (unless
-                    (and ov
-                         (overlay-buffer ov)
+                (unless (and
+                         ov (overlay-buffer ov)
                          (eq (overlay-get
                               ov 'eat--shell-prompt-mark-id)
                              (get-text-property
@@ -4821,8 +4829,10 @@ BUFFER is the terminal buffer."
                   (push ov eat--shell-prompt-mark-overlays))))
             (goto-char (or (next-single-property-change
                             (point) 'eat--shell-prompt-mark-id nil
-                            (eat-term-end eat--terminal))
-                           (eat-term-end eat--terminal)))))))))
+                            (min (eat-term-end eat--terminal)
+                                 (point-max)))
+                           (min (eat-term-end eat--terminal)
+                                (point-max))))))))))
 
 (defun eat--set-cmd (_ cmd)
   "Add CMD to `shell-command-history'."
@@ -4881,6 +4891,31 @@ prompt."
                        (point-max))))
       (unless next
         (user-error "No next prompt")))))
+
+(defun eat-narrow-to-shell-prompt ()
+  "Narrow buffer to the shell prompt and following output at point."
+  (interactive)
+  (widen)
+  (narrow-to-region
+   (save-excursion
+     (while (not (or (bobp) (get-text-property
+                             (point) 'eat--shell-prompt-begin)))
+       (goto-char (or (previous-single-property-change
+                       (point) 'eat--shell-prompt-begin)
+                      (point-min))))
+     (point))
+   (save-excursion
+     (when (and (not (eobp))
+                (get-text-property (point) 'eat--shell-prompt-begin))
+       (goto-char (or (next-single-property-change
+                       (point) 'eat--shell-prompt-begin)
+                      (point-max))))
+     (while (not (or (eobp) (get-text-property
+                             (point) 'eat--shell-prompt-begin)))
+       (goto-char (or (next-single-property-change
+                       (point) 'eat--shell-prompt-begin)
+                      (point-max))))
+     (point))))
 
 
 ;;;;; Input.
@@ -5083,6 +5118,7 @@ STRING and ARG are passed to `yank-pop', which see."
     (define-key map [?\C-c ?\C-k] #'eat-kill-process)
     (define-key map [?\C-c ?\C-p] #'eat-previous-shell-prompt)
     (define-key map [?\C-c ?\C-n] #'eat-next-shell-prompt)
+    (define-key map [?\C-x ?n ?d] #'eat-narrow-to-shell-prompt)
     (define-key map [xterm-paste] #'ignore)
     map)
   "Keymap for Eat mode.")
@@ -5275,7 +5311,16 @@ symbol `buffer', in which case the point of current buffer is set."
 
 When DELETE is given and non-nil, delete the text between BEGIN and
 END if it's safe to do so."
-  (let ((str (eat-term-filter-string (buffer-substring begin end))))
+  (let ((str (buffer-substring begin end)))
+    (remove-text-properties
+     0 (length str)
+     '( eat--before-string nil
+        eat--shell-prompt-mark-id nil
+        eat--shell-prompt-mark-overlay nil
+        eat--shell-prompt-begin nil
+        eat--shell-prompt-end nil)
+     str)
+    (setq str (eat-term-filter-string str))
     (when (and delete
                (or (not eat--terminal)
                    (and (<= (eat-term-end eat--terminal) begin)
@@ -6102,9 +6147,8 @@ symbol `buffer', in which case the point of current buffer is set."
                eat--eshell-char-mode)
            (eat-term-display-beginning eat--terminal)
          (save-restriction
-           (narrow-to-region
-            (eat-term-beginning eat--terminal)
-            (eat-term-end eat--terminal))
+           (narrow-to-region (eat-term-beginning eat--terminal)
+                             (eat-term-end eat--terminal))
            (let ((start-line (- (floor (window-screen-lines))
                                 (line-number-at-pos (point-max)))))
              (goto-char (point-min))

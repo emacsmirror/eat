@@ -426,6 +426,17 @@ the previous shell prompt.  @kbd{C-c C-n}, bound to
 @command{eat-next-shell-prompt}, is the opposite, it goes to the next
 shell prompt.  This doesn't work in Eshell.
 
+@cindex narrow to shell prompt
+@cindex narrow to prompt
+@cindex narrow, shell prompt
+@cindex narrow, prompt
+@kindex C-x n d @r{(``emacs mode'')}
+@kindex C-x n d @r{(``semi-char mode'')}
+@findex eat-narrow-to-shell-prompt
+You can narrow (@pxref{Narrowing,,, emacs, GNU Emacs Manual}) down Eat
+buffer to a shell prompt and its output (if any) using the key
+sequence @kbd{C-x n d}, bound to @command{eat-narrow-to-shell-prompt}.
+
 @cindex shell prompt annotation
 @cindex annotation, shell prompt
 @cindex annotate, shell prompt
@@ -929,7 +940,8 @@ Due to some limitations, shell prompt annotations
 (@pxref{Shell Integration}) can get messed up sometimes.  Eat
 automatically corrects them after each terminal redisplay.  However,
 this can have some performance impact when the terminal scrollback and
-display is large enough.  So Eat defers the correction.
+display is large enough (unless the buffer is narrowed).  So Eat
+defers the correction.
 
 @vindex eat-shell-prompt-annotation-delay
 @defopt eat-shell-prompt-annotation-delay
@@ -942,7 +954,7 @@ instantly, but this may cause the terminal to slow down in some cases.
 @end defopt
 
 The user options described in this chapter have reasonable default
-values, but they may change anytime.
+values, but the default values may change anytime.
 
 @part Part IV:@* Recovering from Problems
 

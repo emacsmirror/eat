@@ -1,6 +1,6 @@
 #+title: Eat: Emulate A Terminal
 
-Eat's name self-explainatory, it stands for "Emulate A Terminal".  Eat
+Eat's name self-explanatory, it stands for "Emulate A Terminal".  Eat
 is a terminal emulator.  It can run most (if not all) full-screen
 terminal programs, including Emacs.
 
@@ -150,7 +150,7 @@ then Eat without byte-compilation).  But it doesn't have a char mode
 (however you can make a char mode spending some effort).  And it too
 flickers like Term, so despite being much faster that Eat, it seems to
 be slow.  If you need your terminal to handle huge bursts (megabytes)
-of data, you should Vterm.
+of data, you should use Vterm.
 
 ** Coterm + Shell
 
