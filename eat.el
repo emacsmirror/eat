@@ -347,7 +347,10 @@ prompt annotation."
   :group 'eat-ui)
 
 (defcustom eat-exec-hook nil
-  "Hook run after `eat' executes a commamnd."
+  "Hook run after `eat' executes a commamnd.
+
+The hook is run with the process run in the terminal as the only
+argument."
   :type 'hook
   :group 'eat-ui)
 
@@ -357,7 +360,10 @@ prompt annotation."
   :group 'eat-ui)
 
 (defcustom eat-exit-hook nil
-  "Hook run after the command executed by `eat' exits."
+  "Hook run after the command executed by `eat' exits.
+
+The hook is run with the process that just exited as the only
+argument."
   :type 'hook
   :group 'eat-ui)
 
@@ -5574,7 +5580,6 @@ to it."
                 (setq eat--shell-prompt-mark nil)
                 (setq eat--shell-prompt-mark-overlays nil))
               (eat-emacs-mode)
-              (delete-process process)
               (eat-term-delete eat--terminal)
               (setq eat--terminal nil)
               (eat--set-cursor nil :default)
@@ -5583,7 +5588,8 @@ to it."
               (insert "\nProcess " (process-name process) " "
                       message)
               (setq buffer-read-only nil))
-            (run-hooks 'eat-exit-hook))
+            (run-hook-with-args 'eat-exit-hook process)
+            (delete-process process))
         (set-process-buffer process nil)))))
 
 (defun eat--adjust-process-window-size (process windows)
@@ -5608,6 +5614,10 @@ of window displaying PROCESS's buffer."
          (run-hooks 'eat-eshell-update-hook))))
     size))
 
+(defun eat--kill-buffer (_process)
+  "Kill current buffer."
+  (kill-buffer (current-buffer)))
+
 ;; Adapted from Term.
 (defun eat-exec (buffer name command startfile switches)
   "Start up a process in BUFFER for Eat mode.
@@ -5621,7 +5631,7 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
       (when-let* ((eat--terminal)
                   (proc (eat-term-parameter
                          eat--terminal 'eat--process)))
-        (remove-hook 'eat-exit-hook #'kill-buffer t)
+        (remove-hook 'eat-exit-hook #'eat--kill-buffer t)
         (delete-process proc))
       ;; Ensure final newline.
       (goto-char (point-max))
@@ -5696,7 +5706,7 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
         (setf (eat-term-parameter eat--terminal 'eat--output-process)
               process)
         (when eat-kill-buffer-on-exit
-          (add-hook 'eat-exit-hook #'kill-buffer 90 t))
+          (add-hook 'eat-exit-hook #'eat--kill-buffer 90 t))
         ;; Feed it the startfile.
         (when startfile
           ;; This is guaranteed to wait long enough
@@ -5710,7 +5720,8 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
           (process-send-string
            process (delete-and-extract-region (point) (point-max)))))
       (eat-term-redisplay eat--terminal))
-    (run-hooks 'eat-exec-hook)
+    (run-hook-with-args 'eat-exec-hook (eat-term-parameter
+                                        eat--terminal 'eat--process))
     buffer))
 
 
