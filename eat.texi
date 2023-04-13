@@ -2,8 +2,8 @@
 
 @comment %**start of header
 @setfilename eat.info
-@set UPDATED 02 April 2023
-@set VERSION 0.7
+@set UPDATED 13 April 2023
+@set VERSION 0.8
 @documentencoding UTF-8
 @codequotebacktick on
 @codequoteundirected on

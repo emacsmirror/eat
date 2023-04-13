@@ -1,3 +1,62 @@
+2023-04-09  Akib Azmain Turja  <akib@disroot.org>
+
+	Pass process to eat-exec-hook and eat-exit-hook
+
+	* eat.el (eat-exec-hook, eat-exit-hook): Update docstring.
+	* eat.el (eat--sentinel): Pass process to 'eat-exit-hook'.
+	Delete process after running 'eat-exit-hook'.
+	* eat.el (eat--kill-buffer): New helper function.
+	* eat.el (eat-exec): Pass process to 'eat-exec-hook'.  Add or
+	remove 'eat--kill-process' from 'eat-exit-hook' instead of
+	'kill-buffer'.
+
+2023-04-09  Akib Azmain Turja  <akib@disroot.org>
+
+	New command 'eat-narrow-to-shell-prompt'
+
+	* eat.el (eat--post-prompt): Put the 'eat--shell-prompt-begin'
+	text property at the beginning of shell prompt.
+	* eat.el (eat--correct-shell-prompt-mark-overlays): Don't try
+	to go outside accessible portion of buffer when the buffer is
+	narrowed.
+	* eat.el (eat-narrow-to-shell-prompt): New command.
+	* eat.el (eat-mode-map): Bind key sequence 'C-x n d' to
+	'eat-narrow-to-shell-prompt'.
+	* eat.el (eat--filter-buffer-substring): Remove all text
+	properties added on UI side before passing buffer substring to
+	'eat-term-filter-string'.
+	* eat.texi (Shell Integration): Document
+	'eat-narrow-to-shell-prompt'.
+
+2023-04-07  Akib Azmain Turja  <akib@disroot.org>
+
+	Run hooks on terminal update and process exit
+
+	* eat.el (eat-exit-hook, eat-update-hook, eat-eshell-exit-hook)
+	(eat-eshell-update-hook): New user option.
+	* eat.el (eat-reset, eat--process-output-queue): Run
+	'eat-update-hook'.
+	* eat.el (eat--sentinel): Don't test 'eat-kill-buffer-on-exit',
+	run 'eat-exit-hook'.
+	* eat.el (eat--adjust-process-window-size): Run
+	'eat-update-hook' when the major mode is 'eat-mode'.  Run
+	'eat-eshell-update-hook' in 'eshell-mode' buffers.
+	* eat.el (eat-exec): Don't let-bind 'eat-kill-buffer-on-exit'
+	while killing old process, remove 'kill-buffer' from hook
+	'eat-exit-hook' instead.  When 'eat-kill-buffer-on-exit' is
+	non-nil, add 'kill-buffer' to 'eat-exit-hook' with priority 90.
+	Run 'eat-exec-hook' outside any let-block.
+	* eat.el (eat--eshell-output-filter): Run
+	'eat-eshell-update-hook'.
+	* eat.el (eat--eshell-cleanup): Run 'eat-eshell-exit-hook'.
+
+2023-04-05  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix resizing when alternative display is enabled
+
+	* eat.el (eat--t-term): Fix error while resizing when
+	alternative display is enabled.
+
 2023-04-02  Akib Azmain Turja  <akib@disroot.org>
 
 	Force directionality of paragraphs in Eat buffer
