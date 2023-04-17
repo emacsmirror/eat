@@ -43,27 +43,29 @@
 
 ;; To start Eat, run M-x eat.  Eat has three keybinding modes:
 
-;;   * "emacs" mode: No special keybinding, except the following:
-
-;;       * `C-c' `C-s': Switch to semi-char mode.
-;;       * `C-c' `C-j': Switch to char mode.
-;;       * `C-c' `C-k': Kill process.
-
-;;   * "semi-char" mode: Most keys are bound to send the key to the
-;;     terminal, except the following keys: `C-\', `C-c', `C-x',
-;;     `C-g', `C-h', `C-M-c', `C-u', `M-x', `M-:', `M-!', `M-&' and
-;;     some other keys (see the user option
-;;     `eat-semi-char-non-bound-keys' for the complete list).  The
-;;     following special keybinding are available:
+;;   * "semi-char" mode: This is the default keybinding mode.  Most
+;;     keys are bound to send the key to the terminal, except the
+;;     following keys: `C-\', `C-c', `C-x', `C-g', `C-h', `C-M-c',
+;;     `C-u', `M-x', `M-:', `M-!', `M-&' and some other keys (see the
+;;     user option `eat-semi-char-non-bound-keys' for the complete
+;;     list).  The following special keybinding are available:
 
 ;;       * `C-q': Send next key to the terminal.
 ;;       * `C-y': Like `yank', but send the text to the terminal.
 ;;       * `M-y': Like `yank-pop', but send the text to the terminal.
 ;;       * `C-c' `C-k': Kill process.
+;;       * `C-c' `C-e': Switch to "emacs" keybinding mode.
+;;       * `C-c' `M-d': Switch to "char" keybinding mode.
+
+;;   * "emacs" mode: No special keybinding, except the following:
+
+;;       * `C-c' `C-j': Switch to "semi-char" keybinding mode.
+;;       * `C-c' `M-d': Switch to "char" keybinding mode.
+;;       * `C-c' `C-k': Kill process.
 
 ;;   * "char" mode: All supported keys are bound to send the key to
 ;;     the terminal, except `C-M-m' or `M-RET', which is bound to
-;;     switch to semi-char mode.
+;;     switch to "semi-char" keybinding mode.
 
 ;; If you like Eshell, then there is a good news for you.  Eat
 ;; integrates with Eshell.  Eat has two global minor modes for Eshell:

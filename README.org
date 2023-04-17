@@ -32,16 +32,18 @@ To start Eat, run =M-x eat=.  Eat has three keybinding modes:
   - =C-y=: Like `yank', but send the text to the terminal.
   - =M-y=: Like `yank-pop', but send the text to the terminal.
   - =C-c C-k=: Kill process.
+  - =C-c C-e=: Switch to "emacs" keybinding mode.
+  - =C-c M-d=: Switch to "char" keybinding mode.
 
 - "emacs" mode: No special keybinding, except the following:
 
-  - =C-c C-j=: Switch to semi-char mode.
-  - =C-c M-d=: Switch to char mode.
+  - =C-c C-j=: Switch to "semi-char" keybinding mode.
+  - =C-c M-d=: Switch to "char" keybinding mode.
   - =C-c C-k=: Kill process.
 
 - "char" mode: All supported keys are bound to send the key to the
   terminal, except =C-M-m= or =M-RET=, which is bound to switch to
-  semi-char mode.
+  "semi-char" keybinding mode.
 
 If you like Eshell, then there is a good news for you.  Eat integrates
 with Eshell.  Eat has two global minor modes for Eshell:
