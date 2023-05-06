@@ -5103,6 +5103,17 @@ STRING and ARG are passed to `yank-pop', which see."
          (yank-from-kill-ring string arg)
          (buffer-string))))))
 
+(defun eat-mouse-yank-primary ()
+  "Send the primary selection to the terminal."
+  (interactive)
+  (eat-send-string-as-yank eat--terminal (gui-get-primary-selection)))
+
+(defun eat-mouse-yank-secondary ()
+  "Send the secondary selection to the terminal."
+  (interactive)
+  (eat-send-string-as-yank
+   eat--terminal (gui-get-selection 'SECONDARY)))
+
 (defun eat-xterm-paste (event)
   "Handle paste operation EVENT from XTerm."
   (interactive "e")
@@ -5143,6 +5154,10 @@ STRING and ARG are passed to `yank-pop', which see."
     (define-key map [?\C-c ?\C-c] #'eat-self-input)
     (define-key map [?\C-c ?\C-e] #'eat-emacs-mode)
     (define-key map [remap insert-char] #'eat-input-char)
+    (define-key map [remap mouse-yank-primary]
+                #'eat-mouse-yank-primary)
+    (define-key map [remap mouse-yank-secondary]
+                #'eat-mouse-yank-secondary)
     (define-key map [xterm-paste] #'eat-xterm-paste)
     map))
 
@@ -5822,6 +5837,10 @@ PROGRAM can be a shell command."
     (define-key map [?\M-y] #'eat-yank-from-kill-ring)
     (define-key map [?\C-c ?\C-e] #'eat-eshell-emacs-mode)
     (define-key map [remap insert-char] #'eat-input-char)
+    (define-key map [remap mouse-yank-primary]
+                #'eat-mouse-yank-primary)
+    (define-key map [remap mouse-yank-secondary]
+                #'eat-mouse-yank-secondary)
     (define-key map [xterm-paste] #'eat-xterm-paste)
     map))
 
