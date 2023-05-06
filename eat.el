@@ -5103,16 +5103,28 @@ STRING and ARG are passed to `yank-pop', which see."
          (yank-from-kill-ring string arg)
          (buffer-string))))))
 
-(defun eat-mouse-yank-primary ()
-  "Send the primary selection to the terminal."
-  (interactive)
+(defun eat-mouse-yank-primary (&optional event)
+  "Send the primary selection to the terminal.
+
+EVENT is the mouse event."
+  (interactive "e")
+  (unless (windowp (posn-window (event-start event)))
+    (error "Position not in text area of window"))
+  (select-window (posn-window (event-start event)))
   (eat-send-string-as-yank eat--terminal (gui-get-primary-selection)))
 
-(defun eat-mouse-yank-secondary ()
-  "Send the secondary selection to the terminal."
-  (interactive)
-  (eat-send-string-as-yank
-   eat--terminal (gui-get-selection 'SECONDARY)))
+(defun eat-mouse-yank-secondary (&optional event)
+  "Send the secondary selection to the terminal.
+
+EVENT is the mouse event."
+  (interactive "e")
+  (unless (windowp (posn-window (event-start event)))
+    (error "Position not in text area of window"))
+  (select-window (posn-window (event-start event)))
+  (let ((secondary (gui-get-selection 'SECONDARY)))
+    (if secondary
+        (eat-send-string-as-yank eat--terminal secondary)
+      (error "No secondary selection"))))
 
 (defun eat-xterm-paste (event)
   "Handle paste operation EVENT from XTerm."
