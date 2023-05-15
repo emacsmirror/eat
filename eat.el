@@ -5108,6 +5108,9 @@ STRING and ARG are passed to `yank-pop', which see."
 
 EVENT is the mouse event."
   (interactive "e")
+  (when select-active-regions
+    (let (select-active-regions)
+      (deactivate-mark)))
   (unless (windowp (posn-window (event-start event)))
     (error "Position not in text area of window"))
   (select-window (posn-window (event-start event)))
