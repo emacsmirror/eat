@@ -221,7 +221,9 @@ make the changes effective."
          (when (and (not eat--being-loaded)
                     (boundp 'eat-semi-char-mode-map))
            (eat-update-semi-char-mode-map)
-           (eat-reload)))
+           (let ((after-load-alist nil)
+                 (after-load-functions nil))
+             (eat-reload))))
   :group 'eat-ui)
 
 (defcustom eat-eshell-semi-char-non-bound-keys
@@ -267,7 +269,9 @@ Eat to make the changes effective."
          (when (and (not eat--being-loaded)
                     (boundp 'eat-eshell-semi-char-mode-map))
            (eat-eshell-update-semi-char-mode-map)
-           (eat-reload)))
+           (let ((after-load-alist nil)
+                 (after-load-functions nil))
+             (eat-reload))))
   :group 'eat-eshell)
 
 (defcustom eat-enable-directory-tracking t
