@@ -4036,11 +4036,14 @@ client process may get confused."
                ('home ?H)
                ('end ?F)
                (_ ?~)))))
-          ('backspace
+          ((or 'backspace ?\C-?)
            (send "\C-?"))
           ('C-backspace
            (send "\C-h"))
-          ('M-backspace
+          ((or 'M-backspace
+               (pred (lambda (ev)
+                       (and (= (event-basic-type ev) ?\C-?)
+                            (equal (event-modifiers ev) '(meta))))))
            (send "\e\C-?"))
           ('C-M-backspace
            (send "\e\C-h"))
@@ -4300,7 +4303,7 @@ CATEGORIES is a list whose elements should be a one of the following
 keywords:
 
   `:ascii'              All self-insertable characters, plus
-                        `backspace', `insert', `delete' and
+                        `backspace', `DEL', `insert', `delete' and
                         `deletechar' keys, with all possible
                         modifiers.
   `:arrow'              Arrow keys with all possible modifiers.
@@ -4319,11 +4322,10 @@ EXCEPTIONS is a list of key sequences to not bind.  Don't use
                 (unless (member key exceptions)
                   (define-key map key input-command))))
       (when (memq :ascii categories)
-        ;; Bind ASCII and self-insertable characters except ESC and
-        ;; DEL.
+        ;; Bind ASCII and self-insertable characters except ESC.
         (bind [remap self-insert-command])
         (cl-loop
-         for i from ?\C-@ to ?~
+         for i from ?\C-@ to ?\C-?
          do (unless (= i meta-prefix-char)
               (bind (vector i))))
         ;; Bind `backspace', `delete', `deletechar', and all modified
@@ -4346,7 +4348,7 @@ EXCEPTIONS is a list of key sequences to not bind.  Don't use
           (define-key map (vector meta-prefix-char)
                       (make-sparse-keymap))
           (cl-loop
-           for i from ?\C-@ to ?~
+           for i from ?\C-@ to ?\C-?
            do (unless (memq i '(?O ?\[))
                 (bind (vector meta-prefix-char i))))
           (bind (vector meta-prefix-char meta-prefix-char))))
