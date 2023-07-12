@@ -5174,6 +5174,7 @@ EVENT is the mouse event."
     (define-key map [?\M-y] #'eat-yank-from-kill-ring)
     (define-key map [?\C-c ?\C-c] #'eat-self-input)
     (define-key map [?\C-c ?\C-e] #'eat-emacs-mode)
+    (define-key map [S-insert] #'eat-yank)
     (define-key map [remap insert-char] #'eat-input-char)
     (define-key map [remap mouse-yank-primary]
                 #'eat-mouse-yank-primary)
@@ -5857,6 +5858,7 @@ PROGRAM can be a shell command."
     (define-key map [?\C-y] #'eat-yank)
     (define-key map [?\M-y] #'eat-yank-from-kill-ring)
     (define-key map [?\C-c ?\C-e] #'eat-eshell-emacs-mode)
+    (define-key map [S-insert] #'eat-yank)
     (define-key map [remap insert-char] #'eat-input-char)
     (define-key map [remap mouse-yank-primary]
                 #'eat-mouse-yank-primary)
