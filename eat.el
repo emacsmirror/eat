@@ -4048,7 +4048,7 @@ client process may get confused."
            (send "\C-h"))
           ((or 'M-backspace
                (pred (lambda (ev)
-                       (and (= (event-basic-type ev) ?\C-?)
+                       (and (equal (event-basic-type ev) ?\C-?)
                             (equal (event-modifiers ev) '(meta))))))
            (send "\e\C-?"))
           ('C-M-backspace
