@@ -1970,14 +1970,20 @@ to (1, 1).  When N is 3, also erase the scrollback."
            ;; Restore point.
            (goto-char pos)))))))
 
-(defun eat--t-device-status-report ()
-  "Send the current Y and X coordinate to client."
-  ;; TODO: Is this really device status report function?
-  (let ((cursor (eat--t-disp-cursor
-                 (eat--t-term-display eat--t-term))))
-    (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
-             (format "\e[%i;%iR" (eat--t-cur-y cursor)
-                     (eat--t-cur-x cursor)))))
+(defun eat--t-device-status-report (n)
+  "Report device (terminal) status.
+
+If N is 5, send OK sequence.  If N is 6, send the current Y and X
+coordinate to client."
+  (pcase n
+    (5
+     (funcall (eat--t-term-input-fn eat--t-term) eat--t-term "\e[0n"))
+    (6
+     (let ((cursor (eat--t-disp-cursor
+                    (eat--t-term-display eat--t-term))))
+       (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
+                (format "\e[%i;%iR" (eat--t-cur-y cursor)
+                        (eat--t-cur-x cursor)))))))
 
 (defun eat--t-set-cursor-state (state)
   "Set cursor state to STATE.
@@ -3218,8 +3224,8 @@ is the selection data encoded in base64."
                       (setq p (cdr p))))
                   (eat--t-set-sgr-params params))
                  ;; CSI 6 n.
-                 ('((?n) nil ((6)))
-                  (eat--t-device-status-report))
+                 (`((?n) nil ((,n)))
+                  (eat--t-device-status-report n))
                  ;; CSI <n> SP q.
                  (`((?q ?\ ) nil ((,n)))
                   (eat--t-set-cursor-style n))
