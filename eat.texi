@@ -72,7 +72,7 @@ Advanced Customizations
 * Mouse Tracking::      Eat tracks mouse, but this can be changed.
 * Clipboard::           Integrating kill ring with terminal.
 * Colors::              Eat can show more than sixteen million colors.
-* Fonts::               Eat can show up to sixty font different fonts.
+* Fonts::               Eat can show up to sixteen different fonts.
 * Blinking Text::       Annoying blinking texts.
 * Performance Tuning::  Fine tuning to maximize performance.
 
