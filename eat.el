@@ -84,6 +84,7 @@
 (require 'subr-x)
 (require 'cl-lib)
 (require 'ansi-color)
+(require 'color)
 (require 'shell)
 (require 'url)
 
@@ -944,7 +945,10 @@ For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
   "Structure describing cursor position."
   (position nil :documentation "Position of cursor.")
   (y 1 :documentation "Y coordinate of cursor.")
-  (x 1 :documentation "X coordinate of cursor."))
+  (x 1 :documentation "X coordinate of cursor.")
+  (sixel-x 0 :documentation "X coordinate of Sixel cursor.")
+  (sixel-y 0 :documentation "Y coordinate of Sixel cursor.")
+  (sixel-beg nil :documentation "Cons cell of current sixel line."))
 
 (cl-defstruct (eat--t-disp
                (:constructor eat--t-make-disp)
@@ -1067,6 +1071,28 @@ Nil when not in alternative display mode.")
   (cut-buffers
    (1value (make-vector 8 nil))
    :documentation "Cut buffers.")
+  (sixel-buffer
+   (let ((pair (cons (cons 0 (make-vector 1000 nil)) nil)))
+     (setf (cdr pair) (cons pair pair))
+     pair)
+   :documentation "Buffer to hold Sixel data.")
+  (sixel-buffer-size 1 :documentation "Line count in Sixel buffer.")
+  (sixel-palette
+   (copy-sequence (make-vector 256 nil))
+   :documentation "Sixel color registers.")
+  (sixel-color 0 :documentation "Current Sixel color register.")
+  (sixel-display-method
+   'background
+   :documentation "Method to display renders Sixel image.")
+  (sixel-image-height
+   nil
+   :documentation "Height of images used to display Sixels.")
+  (sixel-scroll-mode t :documentation "Whether to auto-scroll.")
+  (sixel-initial-cursor-pos
+   '(1 . 1)
+   :documentation "Initial position of cursor before entering Sixel.")
+  (char-width 1 :documentation "Width of each character in pixel.")
+  (char-height 1 :documentation "Height of each character in pixel.")
   ;; NOTE: Change the default value of parameters when changing this.
   (bold-face 'eat-term-bold :documentation "Face for bold text.")
   (faint-face 'eat-term-faint :documentation "Face for faint text.")
@@ -1143,6 +1169,7 @@ Don't `set' it, bind it to a value with `let'.")
     (setf (eat--t-term-mouse-mode eat--t-term) nil)
     (setf (eat--t-term-mouse-encoding eat--t-term) nil)
     (setf (eat--t-term-focus-event-mode eat--t-term) nil)
+    (setf (eat--t-term-sixel-scroll-mode eat--t-term) t)
     ;; Clear everything.
     (delete-region (point-min) (point-max))
     ;; Inform the UI about our new state.
@@ -1465,10 +1492,14 @@ character or its the internal invisible spaces."
                     (eat--t-term-face eat--t-term)))
         (backward-char (- width moved))))))
 
-(defun eat--t-fix-partial-multi-col-char ()
-  "Replace any partial multi-column character with spaces."
-  (let ((face (eat--t-face-face
-               (eat--t-term-face eat--t-term))))
+(defun eat--t-fix-partial-multi-col-char (&optional preserve-face)
+  "Replace any partial multi-column character with spaces.
+
+If PRESERVE-FACE is non-nil, preserve original face."
+  (let ((face (if preserve-face
+                  (get-char-property (point) 'face)
+                (eat--t-face-face
+                 (eat--t-term-face eat--t-term)))))
     (if (get-text-property (point) 'eat--t-invisible-space)
         (let ((start-pos (point))
               (count nil))
@@ -2686,20 +2717,47 @@ the format \"file://HOST/CWD/\"; HOST can be empty."
            (funcall (eat--t-term-set-cwd-fn eat--t-term)
                     eat--t-term host dir)))))))
 
-(defun eat--t-send-device-attrs (params format)
+(defun eat--t-send-device-attrs (n format)
   "Return device attributes.
 
-PARAMS is the parameter list and FORMAT is the format of parameters in
-output."
+FORMAT is the format of parameters in output.  N should be zero."
   (pcase-exhaustive format
     ('nil
-     (when (= (or (caar params) 1) 0)
+     (when (= (or n 0) 0)
        (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
-                "\e[?1;2c")))
+                "\e[?12;4c")))
     (?>
-     (when (= (or (caar params) 1) 0)
+     (when (= (or n 0) 0)
        (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
-                "\e[>0;242;0c")))))
+                "\e[>0;0;0c")))))
+
+(defun eat--t-send-graphics-attrs (attr operation)
+  "Send graphics attributes.
+
+ATTR is the attribute requested, OPERATION is the thing to do (only
+reading an attribute is supported)."
+  (funcall
+   (eat--t-term-input-fn eat--t-term) eat--t-term
+   (if (memq operation '(1 4))
+       (pcase attr
+         (1
+          ;; TODO: Maybe provide an user option to control the value?
+          ;; count?
+          (format "\e[?1;0;256S"))
+         (2
+          ;; TODO: Maybe provide an user option to control the value?
+          (let ((disp (eat--t-term-display eat--t-term)))
+            (format "\e[?2;0;%i;%iS"
+                    (min (* (eat--t-disp-width disp)
+                            (eat--t-term-char-width eat--t-term))
+                         1000)
+                    (min (* (eat--t-disp-height disp)
+                            (eat--t-term-char-height eat--t-term))
+                         1000))))
+         (_
+          (format "\e[?%i;1S" attr)))
+     (format "\e[?%i;%iS" attr
+             (if (<= 1 attr 2) (if (<= 2 operation 3) 3 2) 1)))))
 
 (defun eat--t-report-foreground-color ()
   "Report the current default foreground color to the client."
@@ -2709,7 +2767,7 @@ output."
                   ;; On terminals like TTYs the above returns nil.
                   ;; Terminals usually have a white foreground, so...
                   '(255 255 255))))
-     (format "\e]10;%04x/%04x/%04x\e\\"
+     (format "\e]10;rgb:%04x/%04x/%04x\e\\"
              (pop rgb) (pop rgb) (pop rgb)))))
 
 (defun eat--t-report-background-color ()
@@ -2720,7 +2778,7 @@ output."
                   ;; On terminals like TTYs the above returns nil.
                   ;; Terminals usually have a black background, so...
                   '(0 0 0))))
-     (format "\e]11;%04x/%04x/%04x\e\\"
+     (format "\e]11;rgb:%04x/%04x/%04x\e\\"
              (pop rgb) (pop rgb) (pop rgb)))))
 
 (defun eat--t-manipulate-selection (targets data)
@@ -2810,6 +2868,257 @@ is the selection data encoded in base64."
            (aset (eat--t-term-cut-buffers eat--t-term) (- i ?0)
                  str)))))))
 
+(defun eat--t-sixel-init ()
+  "Initialize Sixel mode."
+  (let ((default-palette
+         (eval-when-compile
+           (vconcat '("#000000" "#3333cc" "#cc2121" "#33cc33"
+                      "#cc33cc" "#33cccc" "#cccc33" "#878787"
+                      "#424242" "#545499" "#994242" "#549954"
+                      "#995499" "#549999" "#999954" "#cccccc")
+                    (make-list 240 "#000000")))))
+    (dotimes (i 256)
+      (setf (aref (eat--t-term-sixel-palette eat--t-term) i)
+            (aref default-palette i))))
+  ;; We just follow XTerm and set the initial foreground color to 3.
+  ;; But even the XTerm authors are unsure about what was the actual
+  ;; default.
+  (setf (eat--t-term-sixel-color eat--t-term) 3)
+  (while (< (eat--t-term-sixel-buffer-size eat--t-term)
+            (+ (eat--t-term-char-height eat--t-term) 5))
+    (let ((new
+           (cons (cons 0 (make-vector 1000 nil))
+                 (cons (cadr (eat--t-term-sixel-buffer eat--t-term))
+                       (eat--t-term-sixel-buffer eat--t-term)))))
+      (setf (cddr (cadr (eat--t-term-sixel-buffer eat--t-term))) new)
+      (setf (cadr (eat--t-term-sixel-buffer eat--t-term)) new)
+      (setf (eat--t-term-sixel-buffer eat--t-term) new))
+    (cl-incf (eat--t-term-sixel-buffer-size eat--t-term)))
+  (let* ((beg (eat--t-term-sixel-buffer eat--t-term))
+         (line beg)
+         (loop t))
+    (while loop
+      (cl-loop for i from 0 to (1- (caar line))
+               do (aset (cdar line) i nil))
+      (setf (caar line) 0)
+      (setq line (cddr line))
+      (when (eq line beg)
+        (setq loop nil))))
+  (let ((cursor (eat--t-disp-cursor
+                 (eat--t-term-display eat--t-term))))
+    (setf (eat--t-cur-sixel-x cursor) 0)
+    (setf (eat--t-cur-sixel-y cursor) 0)
+    (setf (eat--t-cur-sixel-beg cursor)
+          (eat--t-term-sixel-buffer eat--t-term))
+    (unless (eat--t-term-sixel-scroll-mode eat--t-term)
+      (setf (eat--t-term-sixel-initial-cursor-pos eat--t-term)
+            (cons (eat--t-cur-y cursor) (eat--t-cur-x cursor)))
+      (eat--t-goto 1 1))))
+
+(defun eat--t-sixel-write (str beg end count)
+  "Write substring [BEG..END) of STR COUNT times to Sixel buffer."
+  (let ((cursor (eat--t-disp-cursor
+                 (eat--t-term-display eat--t-term))))
+    (dotimes (_ count)
+      (cl-loop
+       for i from beg to (1- end) do
+       (when (= (eat--t-cur-sixel-x cursor) 1000)
+         (setf (eat--t-cur-sixel-x cursor) 999))
+       (let ((bitmap (- (aref str i) ??))
+             (j 0)
+             (line (eat--t-cur-sixel-beg cursor))
+             (color (aref (eat--t-term-sixel-palette eat--t-term)
+                          (eat--t-term-sixel-color eat--t-term))))
+         (while (< j 6)
+           (when (/= (logand bitmap (ash 1 j)) 0)
+             (aset (cdar line) (eat--t-cur-sixel-x cursor) color))
+           (setf line (cddr line))
+           (cl-incf j)))
+       (cl-incf (eat--t-cur-sixel-x cursor))))
+    (let ((i 5)
+          (line (eat--t-cur-sixel-beg cursor)))
+      (while (>= i 0)
+        (setf (caar line) (max (eat--t-cur-sixel-x cursor)
+                               (caar line)))
+        (setf line (cddr line))
+        (cl-decf i)))
+    (when (= (eat--t-cur-sixel-x cursor) 1000)
+      (setf (eat--t-cur-sixel-x cursor) 999))))
+
+(defun eat--t-sixel-flush-line (nullify)
+  "Flush current (not Sixel) line to the display.
+
+If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (sixel-col-count 0)
+         (char-count 0)
+         (lines [])
+         (char-size (cons (eat--t-term-char-width eat--t-term)
+                          (eat--t-term-char-height eat--t-term))))
+    (when (< (length lines) (cdr char-size))
+      (setq lines (make-vector (cdr char-size) nil)))
+    (let ((line (eat--t-term-sixel-buffer eat--t-term)))
+      (dotimes (i (cdr char-size))
+        (setq sixel-col-count (max sixel-col-count (caar line)))
+        (aset lines i (car line))
+        (setf line (cddr line))))
+    (setq char-count
+          (min
+           (/ (+ sixel-col-count (1- (car char-size)))
+              (car char-size))
+           (- (eat--t-disp-width disp) (1- (eat--t-cur-x cursor)))))
+    (save-excursion
+      (let ((j 0))
+        (dotimes (_ char-count)
+          (unless (equal (get-text-property
+                          (point) 'eat--t-sixel-bitmap-size)
+                         char-size)
+            (let ((color
+                   (unless (memq (char-after (point)) '(?\n nil))
+                     (plist-get (get-text-property (point) 'face)
+                                :background)))
+                  (bitmap (make-vector (cdr char-size) nil)))
+              (dotimes (i (cdr char-size))
+                (aset bitmap i (make-vector (car char-size) color)))
+              (insert
+               (propertize " " 'eat--t-sixel-bitmap-size char-size
+                           'eat--t-sixel-bitmap bitmap))
+              (unless (memq (char-after (point)) '(?\n nil))
+                (delete-region (point) (1+ (point))))
+              (backward-char)))
+          (let ((bitmap (get-text-property
+                         (point) 'eat--t-sixel-bitmap))
+                (i 0))
+            (while (and (< i (car char-size))
+                        (< j 1000))
+              (dotimes (k (cdr char-size))
+                (when-let* ((color (aref (cdr (aref lines k)) j)))
+                  (setf (aref (aref bitmap k) i) color)))
+              (cl-incf i)
+              (cl-incf j))
+            (pcase-exhaustive
+                (eat--t-term-sixel-display-method eat--t-term)
+              ('background
+               (when-let* ((color (aref (aref bitmap 0) 0)))
+                 (put-text-property (point) (1+ (point)) 'face
+                                    `(:background ,color))))
+              ('half-block
+               (let ((fg (aref (aref bitmap (/ (cdr char-size) 2)) 0))
+                     (bg (aref (aref bitmap 0) 0)))
+                 (when (or fg bg)
+                   (put-text-property
+                    (point) (1+ (point)) 'display
+                    (propertize
+                     "▄" 'face
+                     `(,@(and bg `(:background ,bg))
+                       :foreground ,(or fg (face-background
+                                            'default))))))))
+              ('svg
+               (put-text-property
+                (point) (1+ (point)) 'display
+                `(image
+                  :type svg
+                  :data
+                  ,(apply
+                    #'concat
+                    (format "<svg width=\"%i\" height=\"%i\""
+                            (car char-size) (cdr char-size))
+                    " version=\"1.1\""
+                    " xmlns=\"http://www.w3.org/2000/svg\""
+                    " xmlns:xlink=\"http://www.w3.org/1999/xlink\">"
+                    (let ((strs '("</svg>")))
+                      (dotimes (i (cdr char-size))
+                        (dotimes (j (car char-size))
+                          (when-let*
+                              ((color (aref (aref bitmap i) j)))
+                            (push
+                             (concat
+                              "<rect width=\"1\" height=\"1\""
+                              (format " x=\"%i\" y=\"%i\"" j i)
+                              (format " fill=\"%s\"></rect>" color))
+                             strs))))
+                      strs))
+                  :height ,(eat--t-term-sixel-image-height
+                            eat--t-term)
+                  :ascent center)))))
+          (forward-char)
+          (eat--t-fix-partial-multi-col-char 'preserve-face))))
+    (dotimes (_ (cdr char-size))
+      (let ((line (eat--t-term-sixel-buffer eat--t-term)))
+        (when nullify
+          (cl-loop for i from 0 to (1- (caar line))
+                   do (aset (cdar line) i nil))
+          (setf (caar line) 0))
+        (setf (eat--t-term-sixel-buffer eat--t-term) (cddr line))))
+    (cl-decf (eat--t-cur-sixel-y cursor) (cdr char-size))))
+
+(defun eat--t-sixel-newline ()
+  "Move to a new Sixel line."
+  (let ((cursor (eat--t-disp-cursor
+                 (eat--t-term-display eat--t-term))))
+    (setf (eat--t-cur-sixel-x cursor) 0)
+    (cl-incf (eat--t-cur-sixel-y cursor) 6)
+    (dotimes (_ 6)
+      (setf (eat--t-cur-sixel-beg cursor)
+            (cddr (eat--t-cur-sixel-beg cursor))))
+    (while (>= (eat--t-cur-sixel-y cursor)
+               (eat--t-term-char-height eat--t-term))
+      (eat--t-sixel-flush-line 'nullify)
+      (if (eat--t-term-sixel-scroll-mode eat--t-term)
+          (eat--t-index)
+        (eat--t-cur-down)))))
+
+(defun eat--t-sixel-set-color-reg (reg spec)
+  "Set Sixel color register REG as described by SPEC."
+  (when (<= reg 255)
+    (let ((color
+           (cond
+            ((= (car spec) 1)
+             (when (and (<= (nth 1 spec) 360)
+                        (<= (nth 2 spec) 100)
+                        (<= (nth 3 spec) 100))
+               (let ((rgb (color-hsl-to-rgb (/ (nth 1 spec) 360.0)
+                                            (/ (nth 3 spec) 100.0)
+                                            (/ (nth 2 spec) 100.0))))
+                 (color-rgb-to-hex (nth 0 rgb) (nth 1 rgb)
+                                   (nth 2 rgb) 2))))
+            ((= (car spec) 2)
+             (when (and (<= (nth 1 spec) 100)
+                        (<= (nth 2 spec) 100)
+                        (<= (nth 3 spec) 100))
+               (color-rgb-to-hex (/ (nth 1 spec) 100.0)
+                                 (/ (nth 2 spec) 100.0)
+                                 (/ (nth 3 spec) 100.0) 2))))))
+      (when color
+        (aset (eat--t-term-sixel-palette eat--t-term) reg color)))))
+
+(defun eat--t-sixel-cleanup ()
+  "Cleanup before potential exit from Sixel mode."
+  (cl-letf* ((cursor (eat--t-disp-cursor
+                      (eat--t-term-display eat--t-term)))
+             ((eat--t-cur-sixel-y cursor) (eat--t-cur-sixel-y cursor))
+             ((eat--t-term-sixel-buffer eat--t-term)
+              (eat--t-term-sixel-buffer eat--t-term)))
+    (while (>= (eat--t-cur-sixel-y cursor) -5)
+      (eat--t-sixel-flush-line nil)
+      (when (>= (eat--t-cur-sixel-y cursor) -5)
+        (if (eat--t-term-sixel-scroll-mode eat--t-term)
+            (eat--t-index)
+          (eat--t-cur-down)))))
+  (unless (eat--t-term-sixel-scroll-mode eat--t-term)
+    (eat--t-goto
+     (car (eat--t-term-sixel-initial-cursor-pos eat--t-term))
+     (cdr (eat--t-term-sixel-initial-cursor-pos eat--t-term)))))
+
+(defun eat--t-sixel-enable-scrolling ()
+  "Enable Sixel scrolling mode."
+  (setf (eat--t-term-sixel-scroll-mode eat--t-term) t))
+
+(defun eat--t-sixel-disable-scrolling ()
+  "Disable Sixel scrolling mode."
+  (setf (eat--t-term-sixel-scroll-mode eat--t-term) nil))
+
 (defun eat--t-prompt-start ()
   "Call shell prompt start hook."
   (funcall (eat--t-term-prompt-start-fn eat--t-term) eat--t-term))
@@ -2865,6 +3174,8 @@ is the selection data encoded in base64."
           (eat--t-blinking-cursor))
          ('(25)
           (eat--t-show-cursor))
+         ('(80)
+          (eat--t-sixel-disable-scrolling))
          ('(1000)
           (eat--t-enable-normal-mouse))
          ('(1002)
@@ -2902,6 +3213,8 @@ is the selection data encoded in base64."
           (eat--t-non-blinking-cursor))
          ('(25)
           (eat--t-hide-cursor))
+         ('(80)
+          (eat--t-sixel-enable-scrolling))
          (`(,(or 9 1000 1002 1003))
           (eat--t-disable-mouse))
          ('(1004)
@@ -3016,7 +3329,8 @@ is the selection data encoded in base64."
              ;; ESC P, or DCS.
              (?P
               (1value (setf (eat--t-term-parser-state eat--t-term)
-                            '(read-dcs ""))))
+                            `(read-dcs-params (read-dcs-function)
+                                              ,(list nil)))))
              ;; ESC X, or SOS.
              (?X
               (1value (setf (eat--t-term-parser-state eat--t-term)
@@ -3062,7 +3376,7 @@ is the selection data encoded in base64."
                  `(read-csi-params ,format ,(list (list nil))))))
         (`(read-csi-params ,format ,params)
          ;; Interpretion of the parameter depends on `format' and
-         ;; other things (including things we haven't got yet)
+         ;; other things (including things we haven't gotten yet)
          ;; according to the standard.  We don't recognize any other
          ;; format of parameters, so we can skip any checks.
          (let ((loop t))
@@ -3164,6 +3478,10 @@ is the selection data encoded in base64."
                  ;; CSI <n> S.
                  (`((?S) nil ((,n)))
                   (eat--t-scroll-up n))
+                 ;; CSI ? <n> ; <m> ; ... S.
+                 (`((?S) ?? ,(or `((,_) (,operation) (,attr))
+                                 `((,_) (,_) (,operation) (,attr))))
+                  (eat--t-send-graphics-attrs attr operation))
                  ;; CSI <n> T.
                  (`((?T) nil ((,n)))
                   (eat--t-scroll-down n))
@@ -3178,16 +3496,8 @@ is the selection data encoded in base64."
                   (eat--t-repeat-last-char n))
                  ;; CSI <n> c.
                  ;; CSI > <n> c.
-                 (`((?c) ,format ,(and (pred listp) params))
-                  ;; Reverse `params' to get it into the correct
-                  ;; order.
-                  (setq params (nreverse params))
-                  (let ((p params))
-                    (while p
-                      (setf (car p) (nreverse (car p)))
-                      (setq p (cdr p))))
-                  ;; TODO: This function kinda a HACK.
-                  (eat--t-send-device-attrs params format))
+                 (`((?c) ,format ((,n)))
+                  (eat--t-send-device-attrs n format))
                  ;; CSI <n> d.
                  (`((?d) nil ((,n)))
                   (eat--t-cur-vertical-abs n))
@@ -3239,8 +3549,7 @@ is the selection data encoded in base64."
                  ;; CSI u.
                  (`((?u) nil nil)
                   (eat--t-restore-cur)))))))
-        (`(,(and (or 'read-dcs 'read-sos 'read-osc 'read-pm 'read-apc)
-                 state)
+        (`(,(and (or 'read-sos 'read-osc 'read-pm 'read-apc) state)
            ,buf)
          ;; Find the end of string.
          (let ((match (string-match (if (eq state 'read-osc)
@@ -3340,6 +3649,122 @@ is the selection data encoded in base64."
                            string-end)
                        (eat--t-manipulate-selection
                         targets data))))))))))
+        (`(read-dcs-params ,next-state ,params)
+         ;; There is no standard format of device control strings, but
+         ;; all DEC and XTerm DCS sequences (including those we
+         ;; support) follow this particular format.
+         (let ((loop t))
+           (while loop
+             (cond
+              ((= index (length output))
+               ;; Output exhausted.  We need to wait for more.
+               (setf (eat--t-term-parser-state eat--t-term)
+                     `(read-dcs-params ,next-state ,params))
+               (setq loop nil))
+              ((not (or (<= ?0 (aref output index) ?9)
+                        (= (aref output index) ?\;)))
+               ;; End of parameters.
+               ;; NOTE: All parameter and their parts are in reverse
+               ;; order!
+               (setf (eat--t-term-parser-state eat--t-term)
+                     `(,@next-state ,params))
+               (setq loop nil))
+              (t
+               (if (= (aref output index) ?\;)
+                   ;; New parameter.
+                   (push nil params)
+                 ;; Number, save it.
+                 (setf (car params)
+                       (+ (* (or (car params) 0) 10)
+                          (- (aref output index) #x30))))
+               (cl-incf index))))))
+        (`(read-dcs-function ,params)
+         (cl-incf index)
+         (pcase (aref output (1- index))
+           (?q
+            (setf (eat--t-term-parser-state eat--t-term)
+                  `(read-sixel init ,params)))
+           (?\e
+            (setf (eat--t-term-parser-state eat--t-term)
+                  '(read-potential-st (read-dcs-fallback))))
+           (_
+            (setf (eat--t-term-parser-state eat--t-term)
+                  '(read-dcs-fallback))
+            (cl-decf index))))
+        (`(read-potential-st ,else)
+         (if (/= (aref output index) ?\\)
+             (setf (eat--t-term-parser-state eat--t-term) else)
+           (setf (eat--t-term-parser-state eat--t-term) nil)
+           (cl-incf index)))
+        (`(read-dcs-fallback)
+         (let ((loop t))
+           (while (and loop (/= index (length output)))
+             (when (= (aref output index) ?\e)
+               (setf (eat--t-term-parser-state eat--t-term)
+                     '(read-potential-st (read-dcs-fallback)))
+               (setq loop nil))
+             (cl-incf index))))
+        (`(read-sixel ,cmd ,params)
+         (when cmd
+           (pcase cmd
+             ('init
+              (eat--t-sixel-init))
+             ('set-color
+              (when (and (= (length params) 1)
+                         (<= (or (car params) 0) 255))
+                (setf (eat--t-term-sixel-color eat--t-term)
+                      (or (car params) 0)))
+              (when (= (length params) 5)
+                (cl-destructuring-bind (z y x coord-sys reg) params
+                  (eat--t-sixel-set-color-reg
+                   (or reg 0) (list coord-sys (or x 0) (or y 0)
+                                    (or z 0))))))
+             ('rle
+              (eat--t-sixel-write output index (1+ index)
+                                  (or (car params) 0))
+              (cl-incf index))
+             ('set-raster-attr
+              ;; TODO: Implement.
+              ))
+           (setf (eat--t-term-parser-state eat--t-term)
+                 `(read-sixel nil nil)))
+         (let ((loop t))
+           (while (and loop (/= index (length output)))
+             (if (<= ?? (aref output index) ?~)
+                 (let ((ins-beg index))
+                   (while (and (/= index (length output))
+                               (<= ?? (aref output index) ?~))
+                     (cl-incf index))
+                   (eat--t-sixel-write output ins-beg index 1))
+               (cl-incf index)
+               (pcase (aref output (1- index))
+                 (?!
+                  (setf (eat--t-term-parser-state eat--t-term)
+                        `(read-dcs-params (read-sixel rle)
+                                          ,(list nil)))
+                  (setq loop nil))
+                 (?-
+                  (eat--t-sixel-newline))
+                 (?$
+                  (setf (eat--t-cur-sixel-x
+                         (eat--t-disp-cursor
+                          (eat--t-term-display eat--t-term)))
+                        0))
+                 (?\#
+                  (setf (eat--t-term-parser-state eat--t-term)
+                        `(read-dcs-params (read-sixel set-color)
+                                          ,(list nil)))
+                  (setq loop nil))
+                 (?\"
+                  (setf (eat--t-term-parser-state eat--t-term)
+                        `(read-dcs-params (read-sixel set-raster-attr)
+                                          ,(list nil)))
+                  (setq loop nil))
+                 (?\e
+                  (eat--t-sixel-cleanup)
+                  (setf (eat--t-term-parser-state eat--t-term)
+                        '(read-potential-st (read-dcs-fallback)))
+                  (setq loop nil)))))))
         (`(read-charset-standard ,slot ,buf)
          ;; Find the end.
          (let ((match (string-match (rx (any ?0 ?2 ?4 ?5 ?6 ?7 ?9 ?<
@@ -3583,7 +4008,23 @@ is the selection data encoded in base64."
      (unless (and (symbolp value) (facep value))
        (signal 'wrong-type-argument (list '(symbolp facep) value)))
      (setf (aref (eat--t-term-font-faces terminal) index)
-           value)))
+           value))
+    ('char-dimensions
+     (unless (and (consp value)
+                  (integerp (car value))
+                  (> (car value) 0)
+                  (integerp (cdr value))
+                  (> (cdr value) 0))
+       (signal 'wrong-type-argument (list 'consp value)))
+     (setf (eat--t-term-char-width terminal) (car value))
+     (setf (eat--t-term-char-height terminal) (cdr value)))
+    ('sixel-display-method
+     (unless (memq value '(background half-block svg))
+       (error "`sixel-display-method' parameter must be set to one of\
+ the supported methods"))
+     (setf (eat--t-term-sixel-display-method terminal) value))
+    ('sixel-image-height
+     (setf (eat--t-term-sixel-image-height terminal) value)))
   ;; Set the parameter.
   (puthash parameter value (eat--t-term-params terminal)))
 
@@ -5709,6 +6150,21 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
             #'eat--pre-cmd)
       (setf (eat-term-cmd-finish-function eat--terminal)
             #'eat--set-cmd-status)
+      (setf (eat-term-parameter eat--terminal 'sixel-display-method)
+            (cond ((and (display-graphic-p)
+                        (image-type-available-p 'svg))
+                   'svg)
+                  ((char-displayable-p ?▄) 'half-block)
+                  (t 'background)))
+      (when (display-graphic-p)
+        (setf (eat-term-parameter eat--terminal 'sixel-image-height)
+              (cons (/ (float (default-font-height))
+                       (font-get
+                        (font-spec :name (face-font 'default))
+                        :size))
+                    'em)))
+      (setf (eat-term-parameter eat--terminal 'char-dimensions)
+            (cons (default-font-width) (default-font-height)))
       ;; Crank up a new process.
       (let* ((size (eat-term-size eat--terminal))
              (process-environment
