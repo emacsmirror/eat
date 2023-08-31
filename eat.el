@@ -6248,6 +6248,32 @@ PROGRAM."
       (eat-exec buffer name program startfile switches))
     buffer))
 
+(defun eat--1 (program arg display-buffer-fn)
+  "Start a new Eat terminal emulator in a buffer.
+
+PROGRAM and ARG is same as in `eat' and `eat-other-window'.
+DISPLAY-BUFFER-FN is the function to display the buffer."
+  (let ((program (or program (or explicit-shell-file-name
+                                 (getenv "ESHELL")
+                                 shell-file-name)))
+        (buffer
+         (cond
+          ((numberp arg)
+	   (get-buffer-create (format "%s<%d>" eat-buffer-name arg)))
+	  (arg
+	   (generate-new-buffer eat-buffer-name))
+	  (t
+	   (get-buffer-create eat-buffer-name)))))
+    (with-current-buffer buffer
+      (unless (eq major-mode #'eat-mode)
+        (eat-mode))
+      (funcall display-buffer-fn buffer)
+      (unless (and eat--terminal
+                   (eat-term-parameter eat--terminal 'eat--process))
+        (eat-exec buffer (buffer-name) "/usr/bin/env" nil
+                  (list "sh" "-c" program)))
+      buffer)))
+
 ;;;###autoload
 (defun eat (&optional program arg)
   "Start a new Eat terminal emulator in a buffer.
@@ -6272,26 +6298,32 @@ PROGRAM can be a shell command."
                                    (getenv "ESHELL")
                                    shell-file-name)))
          current-prefix-arg))
-  (let ((program (or program (or explicit-shell-file-name
-                                 (getenv "ESHELL")
-                                 shell-file-name)))
-        (buffer
-         (cond
-          ((numberp arg)
-	   (get-buffer-create (format "%s<%d>" eat-buffer-name arg)))
-	  (arg
-	   (generate-new-buffer eat-buffer-name))
-	  (t
-	   (get-buffer-create eat-buffer-name)))))
-    (with-current-buffer buffer
-      (unless (eq major-mode #'eat-mode)
-        (eat-mode))
-      (pop-to-buffer-same-window buffer)
-      (unless (and eat--terminal
-                   (eat-term-parameter eat--terminal 'eat--process))
-        (eat-exec buffer (buffer-name) "/usr/bin/env" nil
-                  (list "sh" "-c" program)))
-      buffer)))
+  (eat--1 program arg #'pop-to-buffer-same-window))
+
+;;;###autoload
+(defun eat-other-window (&optional program arg)
+  "Start a new Eat terminal emulator in a buffer in another window.
+
+Start a new Eat session, or switch to an already active session.
+Return the buffer selected (or created).
+
+With a non-numeric prefix ARG, create a new session.
+
+With a numeric prefix ARG switch to the session with that number, or
+create it if it doesn't already exist.
+
+With double prefix argument ARG, ask for the program to run and run it
+in a newly created session.
+
+PROGRAM can be a shell command."
+  (interactive
+   (list (when (equal current-prefix-arg '(16))
+           (read-shell-command "Run program: "
+                               (or explicit-shell-file-name
+                                   (getenv "ESHELL")
+                                   shell-file-name)))
+         current-prefix-arg))
+  (eat--1 program arg #'pop-to-buffer))
 
 
 ;;;; Eshell integration.
