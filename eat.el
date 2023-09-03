@@ -6991,6 +6991,24 @@ that number, or create it if it doesn't already exist."
          (eat-buffer-name (project-prefixed-buffer-name "eat")))
     (eat nil arg)))
 
+;;;###autoload
+(defun eat-project-other-window (&optional arg)
+  "Start Eat in the current project root directory in another window.
+
+Start a new Eat session, or switch to an already active session.
+Return the buffer selected (or created).
+
+With a non-numeric prefix ARG, create a new session.
+
+With a numeric prefix ARG (like
+\\[universal-argument] 42 \\[eat-project]), switch to the session with
+that number, or create it if it doesn't already exist."
+  (interactive "P")
+  (require 'project)
+  (let* ((default-directory (project-root (project-current t)))
+         (eat-buffer-name (project-prefixed-buffer-name "eat")))
+    (eat-other-window nil arg)))
+
 
 ;;;; Tracing.
 
