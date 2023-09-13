@@ -296,7 +296,7 @@ the history of commands like `eat', `shell-command' and
   :group 'eat-ui
   :group 'eat-eshell)
 
-(defcustom eat-enable-native-shell-prompt-editing t
+(defcustom eat-enable-native-shell-prompt-editing nil
   "Non-nil means allowing editing shell prompt using Emacs commands.
 
 When non-nil, you can edit shell prompts with the normal Emacs editing
