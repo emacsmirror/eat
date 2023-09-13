@@ -102,6 +102,17 @@ __eat_enable_integration ()
   done
   # Step 2.2: Assign the first element.
   PROMPT_COMMAND[0]=__eat_before_prompt_command
+  # Send the history, for native shell prompt.
+  printf '\e]51;e;I;0;%s;%s\e\\' \
+         "$(printf "%s" "$HOSTNAME" | base64)" \
+         "$(printf "%s" "$HISTFILE" | base64)"
+  local REPLY
+  IFS=$';\e' read -r -s -t 10 -d "\\" -a REPLY
+  if test "${REPLY[4]}" != 0
+  then
+    printf '\e]51;e;I;1;%s\e\\' \
+           "$(tail -n "${REPLY[4]}" "$HISTFILE" | base64)"
+  fi
 }
 
 # Enable.
