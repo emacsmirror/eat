@@ -6827,6 +6827,9 @@ PROGRAM can be a shell command."
          (let cmd (zero-or-more anything))
          string-end)
      (eat--set-cmd cmd))
+    ;; UIC e ; I ; 0 ; <t> ST.
+    ((rx string-start "e;I;0;" (zero-or-more anything) string-end)
+     (eat-term-send-string eat--terminal "\e]51;e;I;0\e\\"))
     ;; Other sequences are ignored.
     ))
 
