@@ -5149,7 +5149,7 @@ BUFFER is the terminal buffer."
 
 (defun eat--set-cmd (cmd)
   "Add CMD to `shell-command-history'."
-  (when-let* (((and eat-enable-shell-command-history))
+  (when-let* ((eat-enable-shell-command-history)
               (command (ignore-errors (decode-coding-string
                                        (base64-decode-string cmd)
                                        locale-coding-system))))
@@ -6168,6 +6168,8 @@ END if it's safe to do so."
           eat--prompt-input-ring-index
           eat--prompt-stored-incomplete-input
           eat--prompt-matching-input-from-input-string
+          eat--pending-input-chunks
+          eat--process-input-queue-timer
           eat--pending-output-chunks
           eat--output-queue-first-chunk-time
           eat--process-output-queue-timer
@@ -6294,6 +6296,14 @@ The output chunks are pushed, so last output appears first.")
 (defvar eat--process-output-queue-timer nil
   "Timer to process output queue.")
 
+(defvar eat--pending-input-chunks nil
+  "The list of pending input chunks.
+
+The input chunks are pushed, so last input appears first.")
+
+(defvar eat--process-input-queue-timer nil
+  "Timer to process input queue.")
+
 (defvar eat--shell-prompt-annotation-correction-timer nil
   "Timer to correct shell prompt annotations.")
 
@@ -6323,9 +6333,25 @@ OS's."
 
 (defun eat--send-input (_ input)
   "Send INPUT to subprocess."
-  (when-let* ((eat--terminal)
-              (proc (eat-term-parameter eat--terminal 'eat--process)))
-    (eat--send-string proc input)))
+  (push input eat--pending-input-chunks)
+  (unless eat--process-input-queue-timer
+    (setq eat--process-input-queue-timer
+          (run-with-idle-timer 0 nil #'eat--process-input-queue
+                               (current-buffer)))))
+
+(defun eat--process-input-queue (buffer)
+  "Process the input queue on BUFFER."
+  (setf (buffer-local-value 'eat--process-input-queue-timer buffer)
+        nil)
+  (when-let* (((buffer-live-p buffer))
+              (terminal (buffer-local-value 'eat--terminal buffer))
+              (proc (eat-term-parameter terminal 'eat--process))
+              ((process-live-p proc)))
+    (with-current-buffer buffer
+      (let ((chunks (nreverse eat--pending-input-chunks)))
+        (setq eat--pending-input-chunks nil)
+        (dolist (str chunks)
+          (eat--send-string proc str))))))
 
 (defun eat--process-output-queue (buffer)
   "Process the output queue on BUFFER."
