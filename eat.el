@@ -5798,6 +5798,9 @@ MODE should one of:
   (if (not (<= (eat-term-end eat--terminal) (point)))
       (call-interactively #'newline)
     (unless (= (eat-term-end eat--terminal) (point-max))
+      (unless eat--prompt-input-ring
+        (setq eat--prompt-input-ring
+              (make-ring eat-prompt-input-ring-size)))
       (ring-insert eat--prompt-input-ring
                    (buffer-substring-no-properties
                     (eat-term-end eat--terminal) (point-max))))
