@@ -5600,7 +5600,7 @@ EVENT is the mouse event."
     (define-key map [C-up] #'eat-prompt-previous-input)
     (define-key map [C-down] #'eat-prompt-next-input)
     (define-key map [?\M-r] #'eat-prompt-previous-matching-input)
-    (define-key map [?\C-c ?\M-r] #'eat-prompt-find-input)
+    (define-key map [?\C-c ?\C-r] #'eat-prompt-find-input)
     (define-key map [?\C-c ?\M-r]
                 #'eat-prompt-previous-matching-input-from-input)
     (define-key map [?\C-c ?\M-s]

@@ -392,12 +392,14 @@ If you use Zsh, put the following in your @samp{.zshrc} file:
   source "$EAT_SHELL_INTEGRATION_DIR/zsh"
 @end example
 
+@anchor{Directory tracking}
 @cindex directory tracking
 @cindex tracking directory
 @cindex working directory tracking
 @cindex tracking working directory
 @cindex cwd tracking
 @cindex tracking cwd
+@section Directory tracking
 After you've setup shell integration, the Eat will track the working
 directory of your shell.  That means @command{find-file} will start
 from your shell's current working directory.  This also works in
@@ -410,10 +412,12 @@ This controls directory tracking.  When set to non-@code{nil}, Eat
 tracks the current working directory of programs.
 @end defopt
 
+@anchor{Shell Prompt Navigation}
 @cindex shell prompt navigation
 @cindex shell navigation, shell prompt
 @cindex prompt navigation
 @cindex navigation, prompt
+@section Shell Prompt Navigation
 @kindex C-c C-p @r{(``emacs mode''})
 @kindex C-c C-p @r{(``semi-char mode'')}
 @findex eat-previous-shell-prompt
@@ -437,12 +441,14 @@ You can narrow (@pxref{Narrowing,,, emacs, GNU Emacs Manual}) down Eat
 buffer to a shell prompt and its output (if any) using the key
 sequence @kbd{C-x n d}, bound to @command{eat-narrow-to-shell-prompt}.
 
+@anchor{Shell Prompt Annotation}
 @cindex shell prompt annotation
 @cindex annotation, shell prompt
 @cindex annotate, shell prompt
 @cindex prompt annotation
 @cindex annotation, prompt
 @cindex annotate, prompt
+@section Shell Prompt Annotation
 When shell integration is setup, Eat annotates each shell prompt.  Eat
 puts a mark on the shell prompt indicating the whether the command
 entered in that prompt is running, exited successfully or exited with
@@ -488,6 +494,76 @@ the user option
 face @code{eat-shell-prompt-annotation-failure} control the indicator
 used to indicate the command has exited unsuccessfully with non-zero
 exit status.
+
+@anchor{Native Shell Prompt Editing}
+@cindex native shell prompt editing
+@cindex shell prompt native editing
+@cindex native prompt editing
+@cindex prompt native editing
+@cindex shell prompt, native editing
+@cindex prompt, native editing
+@cindex prompt mode
+@cindex mode, prompt
+@cindex keybindings, prompt mode
+@cindex keybinding mode, prompt
+@cindex input mode, prompt
+@section Native Shell Prompt Editing
+
+When this feature is enabled, you can edit shell command with regular
+Emacs command, similar to Shell mode and Term line mode
+(@pxref{Shell Mode,,, emacs, GNU Emacs Manual} and
+@ref{Terminal emulator,,, emacs, GNU Emacs Manual}).  This
+feature isn't support in Eshell.
+
+To enable native shell prompt editing, customize the user option
+@code{eat-enable-native-shell-prompt-editing}.
+
+@vindex eat-enable-native-shell-prompt-editing
+@defopt eat-enable-native-shell-prompt-editing
+When non-nil, enable support for editing shell commands with native
+Emacs commands.
+@end defopt
+
+When the feature is enabled, Eat automatically switches to a input
+mode named ``prompt mode'' when the shell prompt appears.  In this
+mode, you can write and edit your shell command input with Emacs.  You
+can't modify the text inside the terminal, however.
+
+@kindex @key{RET} @r{(``prompt mode'')}
+@kindex C-d @r{(``prompt mode'')}
+@kindex C-c C-c @r{(``prompt mode'')}
+@kindex C-c @key{SPC} @r{(``prompt mode'')}
+@kindex @key{TAB} @r{(``prompt mode'')}
+In ``prompt mode'', just like an ordinary shell, you can send the
+input with @kbd{@key{RET}}, and exit shell with @kbd{C-d} when the
+input is empty.  You can cancel input with @kbd{C-c C-c}.  If you want
+to write a newline without sending it, you can do so with
+@kbd{C-c @key{SPC}}, To perform completion, press @kbd{@key{TAB}}.
+
+@kindex M-p @r{(``prompt mode'')}
+@kindex M-n @r{(``prompt mode'')}
+@kindex C-@key{up} @r{(``prompt mode'')}
+@kindex C-@key{down} @r{(``prompt mode'')}
+@kindex M-r @r{(``prompt mode'')}
+@kindex C-c M-r @r{(``prompt mode'')}
+@kindex C-c M-s @r{(``prompt mode'')}
+@kindex C-c C-r @r{(``prompt mode'')}
+@kindex @key{TAB} @r{(``prompt mode'')}
+You can cycle through history with @kbd{M-p} and @kbd{M-n}, and also
+with @kbd{C-@key{up}} and @kbd{C-@key{down}}.  @kbd{M-r} searches the
+input history, using minibuffer.  @kbd{C-c M-r} and @kbd{C-c M-s}
+searches the input history taking the current input as the query.
+@kbd{C-c M-r} searches backward while @kbd{C-c M-s} searches forward.
+And @kbd{C-c C-r} searches the input history using minibuffer with
+completion.
+
+@kindex C-c C-e @r{(``prompt mode'')}
+@kindex C-c C-j @r{(``prompt mode'')}
+@kindex C-c M-d @r{(``prompt mode'')}
+You can exit to ``emacs mode'', ``semi-char mode'' or ``char mode''
+with @kbd{C-c C-e}, @kbd{C-c C-j} or @kbd{C-c M-d} respectively.  But
+once exited, you can't return to ``prompt mode'' without getting a new
+shell prompt.
 
 @node Querying Before Kill
 @cindex querying before kill
@@ -1158,11 +1234,11 @@ found a bug, please report it.  If you're doubt, please send it
 anyway.  We can't promise that we'll fix the bug or implement your
 feature idea, or always agree that it's a bug, but we always want to
 hear from you.  Please report bugs at
-@url{https://codeberg.org/akib/emacs-eat/issues/new}.  You may send
-the bug report by emailing to the maintain
-(@kbd{M-x describe-package RET eat RET} would show the email address),
-but we prefer the former method, since the report is visible to
-everyone immediately.
+@url{https://codeberg.org/akib/emacs-eat/issues/}.  You may send the
+bug report by emailing to the maintainer
+(@kbd{M-x describe-package @key{RET} eat @key{RET}} would show the
+email address), but we prefer the former method, since the report is
+visible to everyone immediately.
 
 The most important principle in reporting a bug is to report
 @emph{facts}.  Hypotheses and verbal descriptions are useful when they

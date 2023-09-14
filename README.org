@@ -20,7 +20,7 @@ To get the most out of Eat, you should also setup shell integration.
 
 * Usage
 
-To start Eat, run =M-x eat=.  Eat has three keybinding modes:
+To start Eat, run =M-x eat=.  Eat has four keybinding modes:
 
 - "semi-char" mode: This is the default keybinding mode.  Most keys
   are bound to send the key to the terminal, except the following
@@ -45,6 +45,13 @@ To start Eat, run =M-x eat=.  Eat has three keybinding modes:
 - "char" mode: All supported keys are bound to send the key to the
   terminal, except =C-M-m= or =M-RET=, which is bound to switch to
   "semi-char" keybinding mode.
+
+- "prompt" mode: Similar to Shell mode or Term line mode.  You need to
+  enable shell integration to enable this feature.
+
+  - =C-c C-e=: Switch to "emacs" keybinding mode
+  - =C-c C-j=: Switch to "semi-char" keybinding mode.
+  - =C-c M-d=: Switch to "char" keybinding mode.
 
 If you like Eshell, then there is a good news for you.  Eat integrates
 with Eshell.  Eat has two global minor modes for Eshell:
@@ -138,11 +145,8 @@ is pretty good too.  But it's slow.  It is so slow that Eat can beat
 native-compiled Term even without byte-compilation, and when Eat is
 byte-compiled, Eat is more than three times fast.  Also, Term
 flickers, just try to run =emacs -nw= in it.  It doesn't support
-remote connections, for example over Tramp.  However, it has "line"
-mode, which Eat still doesn't have.  If you want line mode in a
-terminal, or use an old version of Emacs, you can use Term, but
-Coterm + Shell is probably a better choice in case your Emacs version
-is 26.1 or above.
+remote connections, for example over Tramp.  However, it's builtin
+from the early days of Emacs, while Eat needs atleast Emacs 28.1.
 
 ** Vterm
 
@@ -163,8 +167,8 @@ just a bit slow than Eat.  However, it too flickers like other
 terminals.  Since it's an upgrade to Shell, you get all the features
 of Shell like "line" mode, completion using your favorite completion
 UI (Company, Corfu, etc), etc.  Most of these features are available
-in Eat-Eshell-Mode as Eshell is similar to Shell, however it's not
-Shell mode.  Recommended if you like Shell.
+in Eat, and also in Eat-Eshell-Mode as Eshell is similar to Shell,
+however it's not Shell mode.  Recommended if you like Shell.
 
 * Acknowledgements
 
