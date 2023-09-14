@@ -6428,6 +6428,11 @@ to it."
                 (delete-region (eat-term-end eat--terminal)
                                (point-max)))
               (eat-emacs-mode)
+              (remove-text-properties
+               (eat-term-beginning eat--terminal)
+               (eat-term-end eat--terminal)
+               '( read-only nil rear-nonsticky nil front-sticky nil
+                  field nil))
               (eat-term-delete eat--terminal)
               (setq eat--terminal nil)
               (eat--set-cursor nil :default)
