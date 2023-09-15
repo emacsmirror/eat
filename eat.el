@@ -6256,7 +6256,7 @@ mouse-3: Switch to char mode"
                 '(" "
                   (:propertize
                    (:eval
-                    (when-let* (((eat--terminal))
+                    (when-let* ((eat--terminal)
                                 (title (eat-term-title eat--terminal))
                                 ((not (string-empty-p title))))
                       (format "(%s)" (string-replace "%" "%%"
