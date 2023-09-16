@@ -5174,8 +5174,8 @@ BUFFER is the terminal buffer."
     ;; We'll update the mark later when the prompt appears.
     (setq eat--shell-command-status code)))
 
-(defun eat--get-shell-history (hist)
-  "Get shell history from HIST."
+(defun eat--get-shell-history (hist format)
+  "Get shell history from HIST in format FORMAT."
   (pcase hist
     (`(,host . ,file)
      (setq host (ignore-errors
@@ -5194,7 +5194,7 @@ BUFFER is the terminal buffer."
              (with-temp-buffer
                (insert-file-contents file)
                (setq str (buffer-string)))
-             (eat--prompt-populate-input-ring str))
+             (eat--prompt-populate-input-ring str format))
          (eat-term-send-string
           eat--terminal
           (format "\e]51;e;I;%s\e\\"
@@ -5203,7 +5203,8 @@ BUFFER is the terminal buffer."
      (eat--prompt-populate-input-ring
       (ignore-errors
         (decode-coding-string (base64-decode-string hist)
-                              locale-coding-system))))))
+                              locale-coding-system))
+      format))))
 
 (defun eat--handle-uic (_ cmd)
   "Handle UI Command sequence CMD."
@@ -5249,14 +5250,16 @@ BUFFER is the terminal buffer."
      (eat--set-cmd-status (string-to-number status)))
     ;; UIC e ; I ; <n> ST.
     ((rx string-start "e;I;0;"
-         (let host (zero-or-more (not ?\;)))
+         (let format (zero-or-more (not ?\;)))
+         ?\; (let host (zero-or-more (not ?\;)))
          ?\; (let path (zero-or-more anything))
          string-end)
-     (eat--get-shell-history (cons host path)))
+     (eat--get-shell-history (cons host path) format))
     ((rx string-start "e;I;1;"
-         (let hist (zero-or-more anything))
+         (let format (zero-or-more (not ?\;)))
+         ?\; (let hist (zero-or-more anything))
          string-end)
-     (eat--get-shell-history hist))))
+     (eat--get-shell-history hist format))))
 
 (defun eat-previous-shell-prompt (&optional arg)
   "Go to the previous shell prompt.
@@ -5851,11 +5854,19 @@ character."
   (setq eat--prompt-stored-incomplete-input nil)
   (setq eat--prompt-matching-input-from-input-string ""))
 
-(defun eat--prompt-populate-input-ring (hist)
-  "Populate `eat--prompt-input-ring' from HIST."
+(defun eat--prompt-populate-input-ring (hist format)
+  "Populate `eat--prompt-input-ring' from HIST in format FORMAT."
   (setq eat--prompt-input-ring (make-ring eat-prompt-input-ring-size))
-  (dolist (item (string-split hist "\n" 'omit-nulls))
-    (ring-insert eat--prompt-input-ring item)))
+  (pcase format
+    ("bash"
+     (dolist (item (string-split hist "\n" 'omit-nulls))
+       (ring-insert eat--prompt-input-ring item)))
+    ("zsh"
+     (dolist (item (string-split hist "\n" 'omit-nulls))
+       (ring-insert eat--prompt-input-ring
+                    (string-trim item (rx ": " (zero-or-more digit)
+                                          ?: (zero-or-more digit)
+                                          ?\;)))))))
 
 (defun eat--prompt-ask-for-regexp-arg (prompt)
   "Return list of regexp and prefix arg using PROMPT."
