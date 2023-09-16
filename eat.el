@@ -4943,6 +4943,9 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 (defvar eat--shell-prompt-mark-overlays nil
   "List of overlay used to put marks before shell prompts.")
 
+(defvar eat--inhibit-prompt-mode nil
+  "Non-nil means don't enter prompt mode.")
+
 (defun eat-reset ()
   "Perform a terminal reset."
   (interactive)
@@ -5083,12 +5086,14 @@ If HOST isn't the host Emacs is running on, don't do anything."
       (put-text-property (1- (point)) (point)
                          'eat--shell-prompt-end t)))
   (setq eat--shell-prompt-begin nil)
-  (when eat-enable-native-shell-prompt-editing
+  (when (and eat-enable-native-shell-prompt-editing
+             (not eat--inhibit-prompt-mode))
     (eat--prompt-mode +1)))
 
 (defun eat--post-cont-prompt ()
   "Enter prompt mode."
-  (when eat-enable-native-shell-prompt-editing
+  (when (and eat-enable-native-shell-prompt-editing
+             (not eat--inhibit-prompt-mode))
     (eat--prompt-mode +1)))
 
 (defun eat--correct-shell-prompt-mark-overlays (buffer)
@@ -5173,6 +5178,10 @@ BUFFER is the terminal buffer."
   (when eat-enable-shell-prompt-annotation
     ;; We'll update the mark later when the prompt appears.
     (setq eat--shell-command-status code)))
+
+(defun eat--before-new-prompt ()
+  "Allow entering prompt mode."
+  (setq eat--inhibit-prompt-mode nil))
 
 (defun eat--get-shell-history (hist format)
   "Get shell history from HIST in format FORMAT."
@@ -5259,7 +5268,9 @@ BUFFER is the terminal buffer."
          (let format (zero-or-more (not ?\;)))
          ?\; (let hist (zero-or-more anything))
          string-end)
-     (eat--get-shell-history hist format))))
+     (eat--get-shell-history hist format))
+    ("e;J"
+     (eat--before-new-prompt))))
 
 (defun eat-previous-shell-prompt (&optional arg)
   "Go to the previous shell prompt.
@@ -5655,8 +5666,10 @@ EVENT is the mouse event."
              (/= (eat-term-end eat--terminal) (point-max)))
     (user-error "Can't switch to Emacs mode from prompt mode when\
  input is non-empty"))
-  (setq eat--prompt-mode-previous-mode 'dont-restore)
-  (eat--prompt-mode -1)
+  (when eat--prompt-mode
+    (setq eat--prompt-mode-previous-mode 'dont-restore)
+    (eat--prompt-mode -1)
+    (setq eat--inhibit-prompt-mode t))
   (eat--semi-char-mode -1)
   (eat--char-mode -1)
   (setq buffer-read-only t)
@@ -5673,8 +5686,10 @@ EVENT is the mouse event."
     (user-error "Can't switch to semi-char mode from prompt mode when\
  input is non-empty"))
   (setq buffer-read-only nil)
-  (setq eat--prompt-mode-previous-mode 'dont-restore)
-  (eat--prompt-mode -1)
+  (when eat--prompt-mode
+    (setq eat--prompt-mode-previous-mode 'dont-restore)
+    (eat--prompt-mode -1)
+    (setq eat--inhibit-prompt-mode t))
   (eat--char-mode -1)
   (eat--semi-char-mode +1)
   (eat--grab-mouse nil eat--mouse-grabbing-type)
@@ -5690,8 +5705,10 @@ EVENT is the mouse event."
     (user-error "Can't switch to char mode from prompt mode when\
  input is non-empty"))
   (setq buffer-read-only nil)
-  (setq eat--prompt-mode-previous-mode 'dont-restore)
-  (eat--prompt-mode -1)
+  (when eat--prompt-mode
+    (setq eat--prompt-mode-previous-mode 'dont-restore)
+    (eat--prompt-mode -1)
+    (setq eat--inhibit-prompt-mode t))
   (eat--semi-char-mode -1)
   (eat--char-mode +1)
   (eat--grab-mouse nil eat--mouse-grabbing-type)
@@ -6177,6 +6194,7 @@ END if it's safe to do so."
           eat--shell-prompt-begin
           eat--shell-prompt-mark
           eat--shell-prompt-mark-overlays
+          eat--inhibit-prompt-mode
           eat--prompt-mode-previous-mode
           eat--prompt-input-ring
           eat--prompt-input-ring-index

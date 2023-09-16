@@ -25,6 +25,8 @@ __eat_precmd () {
     printf '\e]51;e;H;%i\e\\' "$__eat_exit_status"
   fi
   __eat_current_command=""
+  # Inform that a new prompt is going to be printed.
+  printf '\e]51;e;J\e\\'
   # Send the current working directory, for directory tracking.
   printf '\e]51;e;A;%s;%s\e\\' "$(printf "%s" "$HOST" | base64)" \
          "$(printf "%s" "$PWD" | base64)"
