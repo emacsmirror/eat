@@ -7155,6 +7155,8 @@ symbol `buffer', in which case the point of current buffer is set."
                   eat--terminal
                   eat--synchronize-scroll-function
                   eat--mouse-grabbing-type
+                  eat--pending-input-chunks
+                  eat--process-input-queue-timer
                   eat--pending-output-chunks
                   eat--output-queue-first-chunk-time
                   eat--process-output-queue-timer
