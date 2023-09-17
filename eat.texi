@@ -479,7 +479,6 @@ When set to @code{right-margin}, Eat uses the right margin.
 @vindex eat-shell-prompt-annotation-success
 @vindex eat-shell-prompt-annotation-failure-margin-indicator
 @vindex eat-shell-prompt-annotation-failure
-
 Eat uses the strings ``-'', ``0'' and ``X'' respectively to indicate
 the command is running, the command has succeeded and the command has
 failed.  You can also customize the them. The user option
@@ -494,6 +493,40 @@ the user option
 face @code{eat-shell-prompt-annotation-failure} control the indicator
 used to indicate the command has exited unsuccessfully with non-zero
 exit status.
+
+@anchor{Message Passing}
+@section Message Passing
+
+After enabling shell integration, you can send messages to Emacs from
+your shell.  Then you can handle the message on Emacs side using usual
+Emacs Lisp function.
+
+When shell integration script is loaded, a function named
+@command{_eat_msg} is defined in your shell.  You can use this to send
+any message to Emacs.  (The @samp{_} in the beginning of the function
+name is intentional to prevent shadowing any actual command.)
+
+@deffn Command _eat_msg @var{handler-name} @var{message}...
+Send message @var{message}, handled by the handler named
+@var{handler-name} in Emacs.
+@end deffn
+
+The messages are handled with the handlers defined in
+@code{eat-message-handler-alist}.
+
+@vindex eat-message-handler-alist
+@defopt eat-message-handler-alist
+Alist of message handler name and its handler function.  The keys are
+the names of message handlers (i.e. the @var{handler-name} argument of
+@command{_eat_msg}), and the values are their respective handler
+functions.  The handler function is called with the @var{message}
+arguments of @command{_eat_msg}.  Messages with undefined handlers are
+ignored.  To disable message passing, set this to nil.
+@end defopt
+
+Beware, messages can be sent by malicious and/or buggy programs
+running in the shell, therefore you should always verify the message
+before doing anywhere.
 
 @anchor{Native Shell Prompt Editing}
 @cindex native shell prompt editing

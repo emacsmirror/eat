@@ -296,6 +296,20 @@ the history of commands like `eat', `shell-command' and
   :group 'eat-ui
   :group 'eat-eshell)
 
+(defcustom eat-message-handler-alist nil
+  "Alist of message handler name and its handler function.
+
+The keys are the names of message handlers, and the values are their
+respective handler functions.
+
+Shells can send Eat messages, as defined in this user option.  If an
+appropiate message handler is defined, it's called with the other
+arguments, otherwise it's ignored."
+  :type '(alist :key-type string
+                :value-type function)
+  :group 'eat-ui
+  :group 'eat-eshell)
+
 (defcustom eat-enable-native-shell-prompt-editing nil
   "Non-nil means allowing editing shell prompt using Emacs commands.
 
@@ -5215,6 +5229,22 @@ BUFFER is the terminal buffer."
                               locale-coding-system))
       format))))
 
+(defun eat--handle-message (name &rest args)
+  "Handle message with handler name NAME and ARGS."
+  (when-let* ((name (ignore-errors (decode-coding-string
+                                    (base64-decode-string name)
+                                    locale-coding-system)))
+              (handler (assoc name eat-message-handler-alist)))
+    (save-restriction
+      (widen)
+      (save-excursion
+        (apply (cdr handler)
+               (mapcar (lambda (arg)
+                         (ignore-errors (decode-coding-string
+                                         (base64-decode-string arg)
+                                         locale-coding-system)))
+                       args))))))
+
 (defun eat--handle-uic (_ cmd)
   "Handle UI Command sequence CMD."
   (pcase cmd
@@ -5257,20 +5287,27 @@ BUFFER is the terminal buffer."
          (let status (one-or-more digit))
          string-end)
      (eat--set-cmd-status (string-to-number status)))
-    ;; UIC e ; I ; <n> ST.
+    ;; UIC e ; I ; 0 ; <t> ; <t> ; <t> ST.
     ((rx string-start "e;I;0;"
          (let format (zero-or-more (not ?\;)))
          ?\; (let host (zero-or-more (not ?\;)))
          ?\; (let path (zero-or-more anything))
          string-end)
      (eat--get-shell-history (cons host path) format))
+    ;; UIC e ; I ; 1 ; <t> ; <t> ST.
     ((rx string-start "e;I;1;"
          (let format (zero-or-more (not ?\;)))
          ?\; (let hist (zero-or-more anything))
          string-end)
      (eat--get-shell-history hist format))
+    ;; UIC e ; J ST.
     ("e;J"
-     (eat--before-new-prompt))))
+     (eat--before-new-prompt))
+    ;; UIC e ; M ; ... ST.
+    ((rx string-start "e;M;"
+         (let msg (zero-or-more anything))
+         string-end)
+     (apply #'eat--handle-message (string-split msg ";")))))
 
 (defun eat-previous-shell-prompt (&optional arg)
   "Go to the previous shell prompt.
@@ -6894,6 +6931,11 @@ PROGRAM can be a shell command."
     ;; UIC e ; I ; 0 ; <t> ST.
     ((rx string-start "e;I;0;" (zero-or-more anything) string-end)
      (eat-term-send-string eat--terminal "\e]51;e;I;0\e\\"))
+    ;; UIC e ; M ; ... ST.
+    ((rx string-start "e;M;"
+         (let msg (zero-or-more anything))
+         string-end)
+     (apply #'eat--handle-message (string-split msg ";")))
     ;; Other sequences are ignored.
     ))
 
