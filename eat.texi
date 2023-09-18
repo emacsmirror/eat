@@ -908,6 +908,28 @@ and @var{n} can be any number between 0 and 9 (inclusive).  For
 example, the font 6 is can be changed by customizing
 @code{eat-term-font-6}.  Font 0 is the default font.
 
+@node Sixel
+@cindex sixel
+@chapter Sixel
+
+Eat can show Sixel graphics.  Sixel is a bitmap graphics format that
+can be used to display graphics in a terminal, for example, images, or
+plotting graphs.
+
+Eat converts Sixel graphics to an image format Emacs can natively
+display.  This preference of image formats can be configured by
+customizing the @code{eat-sixel-render-formats} user option.
+
+@vindex eat-sixel-render-formats
+@defopt eat-sixel-render-formats
+List of formats to render Sixel, in order of preference.  Each element
+of the list is one of @code{svg}, @code{half-block},
+@code{background}, @code{none}.  @code{svg} means to use SVG image
+format, @code{half-block} means to use UTF-8 half block characters,
+@code{background} means to just use background color, and @code{none}
+means to not render the image, instead just clear the area.
+@end defopt
+
 @node Blinking Text
 @cindex blinking text
 @cindex text, blinking

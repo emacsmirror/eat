@@ -176,7 +176,19 @@ t             Fallback to plain Eshell if `stty' is not available.
 FUNCTION      Call FUNCTION with the command and arguments (using
                 `apply') and fallback to plain Eshell if it returns
                 nil."
-  :type 'boolean
+  :type '(radio (const :tag "Do nothing" nil)
+                (const :tag "Fallback to plain Eshell" t)
+                (const :tag "Ask interactively" ask)
+                (function :tag "Function"))
+  :group 'eat-eshell)
+
+(defcustom eat-sixel-render-formats '(svg half-block background none)
+  "List of formats to render Sixel, in order of preference."
+  :type '(repeat (choice (const :tag "SVG Image" svg)
+                         (const :tag "UTF-8 half block" half-block)
+                         (const :tag "Background color" background)
+                         (const :tag "None" none)))
+  :group 'eat-ui
   :group 'eat-eshell)
 
 (defcustom eat-semi-char-non-bound-keys
@@ -1112,12 +1124,12 @@ Nil when not in alternative display mode.")
    (copy-sequence (make-vector 256 nil))
    :documentation "Sixel color registers.")
   (sixel-color 0 :documentation "Current Sixel color register.")
-  (sixel-display-method
+  (sixel-render-format
    'background
-   :documentation "Method to display renders Sixel image.")
+   :documentation "Format to render Sixel images in.")
   (sixel-image-height
    nil
-   :documentation "Height of images used to display Sixels.")
+   :documentation "Height of images used to display Sixel.")
   (sixel-scroll-mode t :documentation "Whether to auto-scroll.")
   (sixel-initial-cursor-pos
    '(1 . 1)
@@ -3004,7 +3016,8 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
               (cl-incf i)
               (cl-incf j))
             (pcase-exhaustive
-                (eat--t-term-sixel-display-method eat--t-term)
+                (eat--t-term-sixel-render-format eat--t-term)
+              ('none)
               ('background
                (when-let* ((color (aref (aref bitmap 0) 0)))
                  (put-text-property (point) (1+ (point)) 'face
@@ -3965,11 +3978,11 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
        (signal 'wrong-type-argument (list 'consp value)))
      (setf (eat--t-term-char-width terminal) (car value))
      (setf (eat--t-term-char-height terminal) (cdr value)))
-    ('sixel-display-method
-     (unless (memq value '(background half-block svg))
-       (error "`sixel-display-method' parameter must be set to one of\
+    ('sixel-render-format
+     (unless (memq value '(background half-block svg none))
+       (error "`sixel-render-format' parameter must be set to one of\
  the supported methods"))
-     (setf (eat--t-term-sixel-display-method terminal) value))
+     (setf (eat--t-term-sixel-render-format terminal) value))
     ('sixel-image-height
      (setf (eat--t-term-sixel-image-height terminal) value)))
   ;; Set the parameter.
@@ -5023,6 +5036,20 @@ selection, or nil if none."
 (defun eat--bell (_)
   "Ring the bell."
   (ding t))
+
+(defun eat--sixel-render-format ()
+  "Return the suitable Sixel render format."
+  (cl-block nil
+    (dolist (fmt eat-sixel-render-formats)
+      (pcase-exhaustive fmt
+        ('none (cl-return 'none))
+        ('background (cl-return 'background))
+        ('half-block (when (char-displayable-p ?▄)
+                       (cl-return 'half-block)))
+        ('svg (when (and (display-graphic-p)
+                         (image-type-available-p 'svg))
+                (cl-return 'svg)))))
+    'none))
 
 (defun eat--set-cwd (_ host cwd)
   "Set CWD as the current working directory (`default-directory').
@@ -6606,12 +6633,8 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
       (setf (eat-term-set-cwd-function eat--terminal) #'eat--set-cwd)
       (setf (eat-term-parameter eat--terminal 'ui-command-function)
             #'eat--handle-uic)
-      (setf (eat-term-parameter eat--terminal 'sixel-display-method)
-            (cond ((and (display-graphic-p)
-                        (image-type-available-p 'svg))
-                   'svg)
-                  ((char-displayable-p ?▄) 'half-block)
-                  (t 'background)))
+      (setf (eat-term-parameter eat--terminal 'sixel-render-format)
+            (eat--sixel-render-format))
       (when (display-graphic-p)
         (setf (eat-term-parameter eat--terminal 'sixel-image-height)
               (cons (/ (float (default-font-height))
@@ -6984,12 +7007,8 @@ PROGRAM can be a shell command."
     (setf (eat-term-set-cwd-function eat--terminal) #'eat--set-cwd)
     (setf (eat-term-parameter eat--terminal 'ui-command-function)
           #'eat--eshell-handle-uic)
-    (setf (eat-term-parameter eat--terminal 'sixel-display-method)
-          (cond ((and (display-graphic-p)
-                      (image-type-available-p 'svg))
-                 'svg)
-                ((char-displayable-p ?▄) 'half-block)
-                (t 'background)))
+    (setf (eat-term-parameter eat--terminal 'sixel-render-format)
+          (eat--sixel-render-format))
     (when (display-graphic-p)
       (setf (eat-term-parameter eat--terminal 'sixel-image-height)
             (cons (/ (float (default-font-height))
