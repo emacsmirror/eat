@@ -5,7 +5,7 @@
 ;; Author: Akib Azmain Turja <akib@disroot.org>
 ;; Created: 2022-08-15
 ;; Version: 0.8
-;; Package-Requires: ((emacs "28.1"))
+;; Package-Requires: ((emacs "28.1") (compat "29.1"))
 ;; Keywords: terminals processes
 ;; Homepage: https://codeberg.org/akib/emacs-eat
 
@@ -5941,7 +5941,8 @@ character."
   (pcase format
     ("bash"
      (dolist (item (string-split hist "\n" 'omit-nulls))
-       (ring-insert eat--prompt-input-ring item)))
+       (when (/= (aref item 0) ?#)
+         (ring-insert eat--prompt-input-ring item))))
     ("zsh"
      (dolist (item (string-split hist "\n" 'omit-nulls))
        (ring-insert eat--prompt-input-ring
