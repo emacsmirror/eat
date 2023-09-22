@@ -20,12 +20,12 @@ To get the most out of Eat, you should also setup shell integration.
 
 * Usage
 
-To start Eat, run =M-x eat=.  Eat has four keybinding modes:
+To start Eat, run =M-x eat=.  Eat has four input modes:
 
-- "semi-char" mode: This is the default keybinding mode.  Most keys
-  are bound to send the key to the terminal, except the following
-  keys: =C-\=, =C-c=, =C-x=, =C-g=, =C-h=, =C-M-c=, =C-u=, =C-q=,
-  =M-x=, =M-:=, =M-!=, =M-&= and some other keys (see the user option
+- "semi-char" mode: This is the default input mode.  Most keys are
+  bound to send the key to the terminal, except the following keys:
+  =C-\=, =C-c=, =C-x=, =C-g=, =C-h=, =C-M-c=, =C-u=, =C-q=, =M-x=,
+  =M-:=, =M-!=, =M-&= and some other keys (see the user option
   ~eat-semi-char-non-bound-keys~ for the complete list).  The
   following special keybinding are available:
 
@@ -33,25 +33,28 @@ To start Eat, run =M-x eat=.  Eat has four keybinding modes:
   - =C-y=: Like `yank', but send the text to the terminal.
   - =M-y=: Like `yank-pop', but send the text to the terminal.
   - =C-c C-k=: Kill process.
-  - =C-c C-e=: Switch to "emacs" keybinding mode.
-  - =C-c M-d=: Switch to "char" keybinding mode.
+  - =C-c C-e=: Switch to "emacs" input mode.
+  - =C-c M-d=: Switch to "char" input mode.
+  - =C-c C-e=: Switch to "line" input mode.
 
 - "emacs" mode: No special keybinding, except the following:
 
-  - =C-c C-j=: Switch to "semi-char" keybinding mode.
-  - =C-c M-d=: Switch to "char" keybinding mode.
+  - =C-c C-j=: Switch to "semi-char" input mode.
+  - =C-c M-d=: Switch to "char" input mode.
+  - =C-c C-e=: Switch to "line" input mode.
   - =C-c C-k=: Kill process.
 
 - "char" mode: All supported keys are bound to send the key to the
   terminal, except =C-M-m= or =M-RET=, which is bound to switch to
-  "semi-char" keybinding mode.
+  "semi-char" input mode.
 
-- "prompt" mode: Similar to Shell mode or Term line mode.  You need to
-  enable shell integration to enable this feature.
+- "line" mode: Similar to Comint, Shell mode and Term line mode.  In
+  this input mode, terminal input is sent one line at once, and you
+  can edit input line using the usual Emacs commands.
 
-  - =C-c C-e=: Switch to "emacs" keybinding mode
-  - =C-c C-j=: Switch to "semi-char" keybinding mode.
-  - =C-c M-d=: Switch to "char" keybinding mode.
+  - =C-c C-e=: Switch to "emacs" input mode
+  - =C-c C-j=: Switch to "semi-char" input mode.
+  - =C-c M-d=: Switch to "char" input mode.
 
 If you like Eshell, then there is a good news for you.  Eat integrates
 with Eshell.  Eat has two global minor modes for Eshell:
@@ -61,8 +64,9 @@ with Eshell.  Eat has two global minor modes for Eshell:
 
 - ~eat-eshell-mode~: Run Eat inside Eshell.  After enabling this, you
   can run full-screen terminal programs directly in Eshell.  You have
-  the above three keybinding modes here too, except that =C-c C-k= is
-  not special (i.e. not bound by Eat) in "emacs" mode and "line" mode.
+  the above input modes here too, except line mode and that =C-c C-k=
+  is not special (i.e. not bound by Eat) in "emacs" mode and "line"
+  mode.
 
 You can add any of these to ~eshell-load-hook~ like the following:
 
@@ -98,13 +102,8 @@ Eat requires at least Emacs 28.1 or above.
 
 ** NonGNU ELPA
 
-Eat is available on NonGNU ELPA.  If you don't have the archive setup,
-put something like the following in your init file:
-
-#+begin_src emacs-lisp
-(add-to-list 'package-archives
-             '("nongnu" . "https://elpa.nongnu.org/nongnu/"))
-#+end_src
+Eat is available on NonGNU ELPA.  So you can just do
+=M-x package-install RET eat RET=.
 
 ** Quelpa
 

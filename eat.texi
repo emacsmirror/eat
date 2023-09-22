@@ -364,6 +364,68 @@ From ``emacs mode'', you can switch to ``semi-char mode'' with
 command @command{eshell-toggle-direct-send} is remapped to enable
 ``char-mode'', which is usually bound to @kbd{C-c M-d}.
 
+@anchor{Line Mode}
+@cindex line mode
+@cindex mode, line
+@cindex keybindings, line mode
+@cindex keybinding mode, line
+@cindex input mode, line
+@section Line Mode
+
+In ``line mode'', input is sent one line at a line, similar to Comint
+or Shell mode (@pxref{Interactive Shell,,, emacs, GNU Emacs Manual}).
+Like ``emacs mode'', you can interact with buffer as you wish; but at
+the very end of the buffer, you can edit the input line with usual
+Emacs commands.  This is not available in Eshell.
+
+@kindex C-c C-l @r{(``semi-char mode'')}
+@kindex C-c C-l @r{(``emacs mode'')}
+To enter ``line mode'', press @kbd{C-c C-l} from ``semi-char mode'' or
+``emacs mode''.
+
+@kindex @key{RET} @r{(``line mode'')}
+@kindex C-c @key{SPC} @r{(``line mode'')}
+@kbd{@key{RET}} sends the current input with a trailing newline, and
+clear the input area for new input to be written.  When called with a
+prefix argument, no newline is appended before sending input.  To
+input a newline character without actually sending it, you can press
+@kbd{C-c @key{SPC}}.
+
+@kindex C-c C-c @r{(``line mode'')}
+@kindex C-d @r{(``line mode'')}
+@kbd{C-c C-c} discards the input completely and sends an interrupt to
+the terminal.  @kbd{C-d} deletes the character after the point, or
+sends EOF if the input is empty.
+
+@kindex C-c C-e @r{(``line mode'')}
+@kindex C-c C-j @r{(``line mode'')}
+@kindex C-c M-d @r{(``line mode'')}
+You can exit to ``emacs mode'', ``semi-char mode'' or ``char mode''
+with @kbd{C-c C-e}, @kbd{C-c C-j} or @kbd{C-c M-d} respectively.  If
+there's any pending input when exiting line mode, it is sent as is to
+the terminal.
+
+@kindex M-p @r{(``line mode'')}
+@kindex M-n @r{(``line mode'')}
+@kindex C-@key{up} @r{(``line mode'')}
+@kindex C-@key{down} @r{(``line mode'')}
+@kindex M-r @r{(``line mode'')}
+@kindex C-c M-r @r{(``line mode'')}
+@kindex C-c M-s @r{(``line mode'')}
+@kindex C-c C-r @r{(``line mode'')}
+@kindex @key{TAB} @r{(``line mode'')}
+The input history is recorded.  You can cycle through the history with
+@kbd{M-p} and @kbd{M-n}, and also with @kbd{C-@key{up}} and
+@kbd{C-@key{down}}.  @kbd{M-r} searches the input history, using the
+minibuffer.  @kbd{C-c M-r} and @kbd{C-c M-s} searches the input
+history taking the current input as the query.  @kbd{C-c M-r} searches
+backward while @kbd{C-c M-s} searches forward.  And @kbd{C-c C-r}
+searches the input history using minibuffer with completion, useful
+specially if you use any minibuffer completion UI/framework.
+
+Input history is not loaded from the shell history file, to do that,
+@xref{Line Mode Integration}.
+
 @part Part III:@* Advanced Customizations
 
 @node Shell Integration
@@ -528,75 +590,22 @@ Beware, messages can be sent by malicious and/or buggy programs
 running in the shell, therefore you should always verify the message
 before doing anywhere.
 
-@anchor{Native Shell Prompt Editing}
-@cindex native shell prompt editing
-@cindex shell prompt native editing
-@cindex native prompt editing
-@cindex prompt native editing
-@cindex shell prompt, native editing
-@cindex prompt, native editing
-@cindex prompt mode
-@cindex mode, prompt
-@cindex keybindings, prompt mode
-@cindex keybinding mode, prompt
-@cindex input mode, prompt
-@section Native Shell Prompt Editing
+@anchor{Line Mode Integration}
+@cindex line mode integration
+@cindex line mode shell integration
+@cindex integration, shell, line mode
+@section Line Mode Integration
 
-When this feature is enabled, you can edit shell command with regular
-Emacs command, similar to Shell mode and Term line mode
-(@pxref{Shell Mode,,, emacs, GNU Emacs Manual} and
-@ref{Terminal emulator,,, emacs, GNU Emacs Manual}).  This
-feature isn't support in Eshell.
+When shell integration is enabled, the input history of line mode is
+automatically filled with the shell history when the shell starts.
+Also you can make Eat automatically switch to ``line mode''
+(@pxref{Line Mode}) for you when the shell prompt appears.
 
-To enable native shell prompt editing, customize the user option
-@code{eat-enable-native-shell-prompt-editing}.
-
-@vindex eat-enable-native-shell-prompt-editing
-@defopt eat-enable-native-shell-prompt-editing
-When non-nil, enable support for editing shell commands with native
-Emacs commands.
+@vindex eat-enable-auto-line-mode
+@defopt eat-enable-auto-line-mode
+When non-nil, automatically switch to line mode the shell prompt
+appears.
 @end defopt
-
-When the feature is enabled, Eat automatically switches to a input
-mode named ``prompt mode'' when the shell prompt appears.  In this
-mode, you can write and edit your shell command input with Emacs.  You
-can't modify the text inside the terminal, however.
-
-@kindex @key{RET} @r{(``prompt mode'')}
-@kindex C-d @r{(``prompt mode'')}
-@kindex C-c C-c @r{(``prompt mode'')}
-@kindex C-c @key{SPC} @r{(``prompt mode'')}
-@kindex @key{TAB} @r{(``prompt mode'')}
-In ``prompt mode'', just like an ordinary shell, you can send the
-input with @kbd{@key{RET}}, and exit shell with @kbd{C-d} when the
-input is empty.  You can cancel input with @kbd{C-c C-c}.  If you want
-to write a newline without sending it, you can do so with
-@kbd{C-c @key{SPC}}, To perform completion, press @kbd{@key{TAB}}.
-
-@kindex M-p @r{(``prompt mode'')}
-@kindex M-n @r{(``prompt mode'')}
-@kindex C-@key{up} @r{(``prompt mode'')}
-@kindex C-@key{down} @r{(``prompt mode'')}
-@kindex M-r @r{(``prompt mode'')}
-@kindex C-c M-r @r{(``prompt mode'')}
-@kindex C-c M-s @r{(``prompt mode'')}
-@kindex C-c C-r @r{(``prompt mode'')}
-@kindex @key{TAB} @r{(``prompt mode'')}
-You can cycle through history with @kbd{M-p} and @kbd{M-n}, and also
-with @kbd{C-@key{up}} and @kbd{C-@key{down}}.  @kbd{M-r} searches the
-input history, using minibuffer.  @kbd{C-c M-r} and @kbd{C-c M-s}
-searches the input history taking the current input as the query.
-@kbd{C-c M-r} searches backward while @kbd{C-c M-s} searches forward.
-And @kbd{C-c C-r} searches the input history using minibuffer with
-completion.
-
-@kindex C-c C-e @r{(``prompt mode'')}
-@kindex C-c C-j @r{(``prompt mode'')}
-@kindex C-c M-d @r{(``prompt mode'')}
-You can exit to ``emacs mode'', ``semi-char mode'' or ``char mode''
-with @kbd{C-c C-e}, @kbd{C-c C-j} or @kbd{C-c M-d} respectively.  But
-once exited, you can't return to ``prompt mode'' without getting a new
-shell prompt.
 
 @node Querying Before Kill
 @cindex querying before kill

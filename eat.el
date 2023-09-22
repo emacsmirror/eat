@@ -322,25 +322,22 @@ arguments, otherwise it's ignored."
   :group 'eat-ui
   :group 'eat-eshell)
 
-(defcustom eat-enable-native-shell-prompt-editing nil
-  "Non-nil means allowing editing shell prompt using Emacs commands.
-
-When non-nil, you can edit shell prompts with the normal Emacs editing
-commands."
+(defcustom eat-enable-auto-line-mode nil
+  "Non-nil means switch to line mode automatically on shell prompt."
   :type 'boolean
   :group 'eat-ui)
 
-(defcustom eat-prompt-input-ring-size 1000
+(defcustom eat-line-input-ring-size 1000
   "Number of input history items to keep."
   :type 'natnump
   :group 'eat-ui)
 
-(defcustom eat-prompt-move-point-for-matching-input 'after-input
+(defcustom eat-line-move-point-for-matching-input 'after-input
   "Controls where to place point after matching input.
 
-\\<eat-prompt-mode-map>This influences the commands \
-\\[eat-prompt-previous-matching-input-from-input] and \
-\\[eat-prompt-next-matching-input-from-input].
+\\<eat-line-mode-map>This influences the commands \
+\\[eat-line-previous-matching-input-from-input] and \
+\\[eat-line-next-matching-input-from-input].
 If `after-input', point will be positioned after the input typed
 by the user, but before the rest of the history entry that has
 been inserted.  If `end-of-line', point will be positioned at the
@@ -349,14 +346,13 @@ end of the current logical (not visual) line after insertion."
                 (const :tag "Move to end of line" end-of-line))
   :group 'eat-ui)
 
-(defcustom eat-prompt-input-send-function
-  #'eat-prompt-send-default
+(defcustom eat-line-input-send-function #'eat-line-send-default
   "Function to send the shell prompt input.
 
 The function is called without any argument.  The buffer is narrowed
 to the input.  The function may modify the input but mustn't modify
 the buffer restrictions.  It should call
-`eat-prompt-send-default' to send the final output."
+`eat-line-send-default' to send the final output."
   :type 'function
   :group 'eat-ui)
 
@@ -4970,8 +4966,11 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 (defvar eat--shell-prompt-mark-overlays nil
   "List of overlay used to put marks before shell prompts.")
 
-(defvar eat--inhibit-prompt-mode nil
-  "Non-nil means don't enter prompt mode.")
+(defvar eat--inhibit-auto-line-mode nil
+  "Non-nil means don't enter line mode.")
+
+(defvar eat--auto-line-mode-prev-mode nil
+  "The input mode active before line mode.")
 
 (defun eat-reset ()
   "Perform a terminal reset."
@@ -5081,8 +5080,39 @@ If HOST isn't the host Emacs is running on, don't do anything."
     (set-process-query-on-exit-flag
      (eat-term-parameter eat--terminal 'eat--process) nil)))
 
+(defvar eat--line-mode)
+(defvar eat--semi-char-mode)
+(defvar eat--char-mode)
+
+(defun eat--line-mode-enter-auto ()
+  "Enter line mode."
+  (unless (or eat--inhibit-auto-line-mode eat--line-mode)
+    (unless eat--line-mode
+      (setq eat--auto-line-mode-prev-mode
+            (cond (eat--semi-char-mode 'semi-char)
+                  (eat--char-mode 'char)
+                  (t 'emacs)))
+      (eat-line-mode)
+      ;; We're entering automatically, so we should be able to exit it
+      ;; automatically.
+      (setq eat--inhibit-auto-line-mode nil))))
+
+(defun eat--line-mode-exit-auto ()
+  "Exit line mode."
+  (when (and (not eat--inhibit-auto-line-mode)
+             eat--auto-line-mode-prev-mode)
+    (pcase eat--auto-line-mode-prev-mode
+      ('emacs (eat-emacs-mode))
+      ('semi-char (eat-semi-char-mode))
+      ('char (eat-char-mode)))
+    (setq eat--auto-line-mode-prev-mode nil)
+    (when (/= (eat-term-end eat--terminal) (point-max))
+      (eat-line-send))
+    (eat--line-mode -1)
+    (setq buffer-undo-list nil)))
+
 (defun eat--post-prompt ()
-  "Put a mark in the marginal area and enter prompt mode."
+  "Put a mark in the marginal area and enter line mode."
   (when eat-enable-shell-prompt-annotation
     (let ((indicator
            (if (zerop eat--shell-command-status)
@@ -5127,15 +5157,13 @@ If HOST isn't the host Emacs is running on, don't do anything."
       (put-text-property (1- (point)) (point)
                          'eat--shell-prompt-end t)))
   (setq eat--shell-prompt-begin nil)
-  (when (and eat-enable-native-shell-prompt-editing
-             (not eat--inhibit-prompt-mode))
-    (eat--prompt-mode +1)))
+  (when eat-enable-auto-line-mode
+    (eat--line-mode-enter-auto)))
 
 (defun eat--post-cont-prompt ()
-  "Enter prompt mode."
-  (when (and eat-enable-native-shell-prompt-editing
-             (not eat--inhibit-prompt-mode))
-    (eat--prompt-mode +1)))
+  "Enter line mode."
+  (when eat-enable-auto-line-mode
+    (eat--line-mode-enter-auto)))
 
 (defun eat--correct-shell-prompt-mark-overlays (buffer)
   "Correct all overlays used to add mark before shell prompt.
@@ -5212,7 +5240,9 @@ BUFFER is the terminal buffer."
     (setf (cadr eat--shell-prompt-mark)
           (propertize
            eat-shell-prompt-annotation-running-margin-indicator
-           'face '(eat-shell-prompt-annotation-running default)))))
+           'face '(eat-shell-prompt-annotation-running default))))
+  (when eat-enable-auto-line-mode
+    (eat--line-mode-exit-auto)))
 
 (defun eat--set-cmd-status (code)
   "Set CODE as the current shell command's exit status."
@@ -5221,8 +5251,8 @@ BUFFER is the terminal buffer."
     (setq eat--shell-command-status code)))
 
 (defun eat--before-new-prompt ()
-  "Allow entering prompt mode."
-  (setq eat--inhibit-prompt-mode nil))
+  "Allow entering line mode."
+  (setq eat--inhibit-auto-line-mode nil))
 
 (defun eat--get-shell-history (hist format)
   "Get shell history from HIST in format FORMAT."
@@ -5234,23 +5264,20 @@ BUFFER is the terminal buffer."
      (setq file (ignore-errors
                   (decode-coding-string (base64-decode-string file)
                                         locale-coding-system)))
-     (if (not eat-enable-native-shell-prompt-editing)
-         (eat-term-send-string eat--terminal "\e]51;e;I;0\e\\")
-       (if (and host file
-                (string= host (system-name))
-                (file-readable-p file))
-           (let ((str nil))
-             (eat-term-send-string eat--terminal "\e]51;e;I;0\e\\")
-             (with-temp-buffer
-               (insert-file-contents file)
-               (setq str (buffer-string)))
-             (eat--prompt-populate-input-ring str format))
-         (eat-term-send-string
-          eat--terminal
-          (format "\e]51;e;I;%s\e\\"
-                  eat-prompt-input-ring-size)))))
+     (if (and host file
+              (string= host (system-name))
+              (file-readable-p file))
+         (let ((str nil))
+           (eat-term-send-string eat--terminal "\e]51;e;I;0\e\\")
+           (with-temp-buffer
+             (insert-file-contents file)
+             (setq str (buffer-string)))
+           (eat--line-populate-input-ring str format))
+       (eat-term-send-string
+        eat--terminal
+        (format "\e]51;e;I;%s\e\\" eat-line-input-ring-size))))
     ((pred stringp)
-     (eat--prompt-populate-input-ring
+     (eat--line-populate-input-ring
       (ignore-errors
         (decode-coding-string (base64-decode-string hist)
                               locale-coding-system))
@@ -5620,6 +5647,7 @@ EVENT is the mouse event."
   (let ((map (make-sparse-keymap)))
     (define-key map [?\C-c ?\M-d] #'eat-char-mode)
     (define-key map [?\C-c ?\C-j] #'eat-semi-char-mode)
+    (define-key map [?\C-c ?\C-l] #'eat-line-mode)
     (define-key map [?\C-c ?\C-k] #'eat-kill-process)
     (define-key map [?\C-c ?\C-p] #'eat-previous-shell-prompt)
     (define-key map [?\C-c ?\C-n] #'eat-next-shell-prompt)
@@ -5665,26 +5693,26 @@ EVENT is the mouse event."
     map)
   "Keymap for Eat char mode.")
 
-(defvar eat-prompt-mode-map
+(defvar eat-line-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [?\C-c ?\C-e] #'eat-emacs-mode)
     (define-key map [?\t] #'completion-at-point)
-    (define-key map [?\C-m] #'eat-prompt-newline)
-    (define-key map [?\C-d] #'eat-prompt-delchar-or-eof)
-    (define-key map [?\C-c ?\C-c] #'eat-prompt-send-interrupt)
+    (define-key map [?\C-m] #'eat-line-send-input)
+    (define-key map [?\C-d] #'eat-line-delchar-or-eof)
+    (define-key map [?\C-c ?\C-c] #'eat-line-send-interrupt)
     (define-key map [?\C-c ?\s] #'newline)
-    (define-key map [?\M-p] #'eat-prompt-previous-input)
-    (define-key map [?\M-n] #'eat-prompt-next-input)
-    (define-key map [C-up] #'eat-prompt-previous-input)
-    (define-key map [C-down] #'eat-prompt-next-input)
-    (define-key map [?\M-r] #'eat-prompt-previous-matching-input)
-    (define-key map [?\C-c ?\C-r] #'eat-prompt-find-input)
+    (define-key map [?\M-p] #'eat-line-previous-input)
+    (define-key map [?\M-n] #'eat-line-next-input)
+    (define-key map [C-up] #'eat-line-previous-input)
+    (define-key map [C-down] #'eat-line-next-input)
+    (define-key map [?\M-r] #'eat-line-previous-matching-input)
+    (define-key map [?\C-c ?\C-r] #'eat-line-find-input)
     (define-key map [?\C-c ?\M-r]
-                #'eat-prompt-previous-matching-input-from-input)
+                #'eat-line-previous-matching-input-from-input)
     (define-key map [?\C-c ?\M-s]
-                #'eat-prompt-next-matching-input-from-input)
+                #'eat-line-next-matching-input-from-input)
     map)
-  "Keymap for Eat native shell prompt mode.")
+  "Keymap for Eat line mode.")
 
 (defvar eat--mouse-click-mode-map
   (eat-term-make-keymap #'eat-self-input '(:mouse-click) nil)
@@ -5720,20 +5748,10 @@ EVENT is the mouse event."
   "Minor mode for mouse movement keymap."
   :interactive nil)
 
-(defvar eat--prompt-mode)
-(defvar eat--prompt-mode-previous-mode)
-
 (defun eat-emacs-mode ()
   "Switch to Emacs keybindings mode."
   (interactive)
-  (when (and eat--prompt-mode
-             (/= (eat-term-end eat--terminal) (point-max)))
-    (user-error "Can't switch to Emacs mode from prompt mode when\
- input is non-empty"))
-  (when eat--prompt-mode
-    (setq eat--prompt-mode-previous-mode 'dont-restore)
-    (eat--prompt-mode -1)
-    (setq eat--inhibit-prompt-mode t))
+  (eat--line-mode-exit)
   (eat--semi-char-mode -1)
   (eat--char-mode -1)
   (setq buffer-read-only t)
@@ -5745,15 +5763,8 @@ EVENT is the mouse event."
   (interactive)
   (unless eat--terminal
     (error "Process not running"))
-  (when (and eat--prompt-mode
-             (/= (eat-term-end eat--terminal) (point-max)))
-    (user-error "Can't switch to semi-char mode from prompt mode when\
- input is non-empty"))
   (setq buffer-read-only nil)
-  (when eat--prompt-mode
-    (setq eat--prompt-mode-previous-mode 'dont-restore)
-    (eat--prompt-mode -1)
-    (setq eat--inhibit-prompt-mode t))
+  (eat--line-mode-exit)
   (eat--char-mode -1)
   (eat--semi-char-mode +1)
   (eat--grab-mouse nil eat--mouse-grabbing-type)
@@ -5764,15 +5775,8 @@ EVENT is the mouse event."
   (interactive)
   (unless eat--terminal
     (error "Process not running"))
-  (when (and eat--prompt-mode
-             (/= (eat-term-end eat--terminal) (point-max)))
-    (user-error "Can't switch to char mode from prompt mode when\
- input is non-empty"))
   (setq buffer-read-only nil)
-  (when eat--prompt-mode
-    (setq eat--prompt-mode-previous-mode 'dont-restore)
-    (eat--prompt-mode -1)
-    (setq eat--inhibit-prompt-mode t))
+  (eat--line-mode-exit)
   (eat--semi-char-mode -1)
   (eat--char-mode +1)
   (eat--grab-mouse nil eat--mouse-grabbing-type)
@@ -5824,37 +5828,38 @@ MODE should one of:
      (eat--mouse-movement-mode -1))))
 
 
-;;;;; Prompt Mode.
+;;;;; Line Mode.
 
-(defvar eat--prompt-mode-previous-mode nil
-  "The input mode active before prompt mode.")
-
-(define-minor-mode eat--prompt-mode
-  "Minor mode for prompt mode."
+(define-minor-mode eat--line-mode
+  "Minor mode for line mode."
   :interactive nil
-  :keymap eat-prompt-mode-map
-  (if eat--prompt-mode
-      (unless eat--prompt-mode-previous-mode
-        (setq eat--prompt-mode-previous-mode
-              (cond (eat--semi-char-mode 'semi-char)
-                    (eat--char-mode 'char)
-                    (t 'emacs)))
-        (eat--semi-char-mode -1)
-        (eat--char-mode -1)
-        (eat--grab-mouse nil eat--mouse-grabbing-type)
-        (setq buffer-read-only nil)
-        (eat--prompt-reset-input-ring-vars))
-    (when eat--prompt-mode-previous-mode
-      (pcase eat--prompt-mode-previous-mode
-        ('emacs (eat-emacs-mode))
-        ('semi-char (eat-semi-char-mode))
-        ('char (eat-char-mode)))
-      (setq eat--prompt-mode-previous-mode nil)
-      ;; Delete the undo list so that `undo' doesn't mess up with the
-      ;; terminal.
-      (setq buffer-undo-list nil))))
+  :keymap eat-line-mode-map)
 
-(defun eat-prompt-send-default ()
+(defun eat-line-mode ()
+  "Switch to line mode."
+  (interactive)
+  (eat--line-mode +1)
+  (eat--semi-char-mode -1)
+  (eat--char-mode -1)
+  (eat--grab-mouse nil eat--mouse-grabbing-type)
+  (setq buffer-read-only nil)
+  ;; Delete the undo list so that `undo' doesn't mess up with the
+  ;; terminal.
+  (setq buffer-undo-list nil)
+  ;; Don't let auto line mode exit line mode.
+  (setq eat--inhibit-auto-line-mode t))
+
+(defun eat--line-mode-exit ()
+  "Exit line mode, called only by interactive commands."
+  (when eat--line-mode
+    (when (/= (eat-term-end eat--terminal) (point-max))
+      (eat-line-send))
+    (eat--line-mode -1)
+    (setq buffer-undo-list nil)
+    (setq eat--inhibit-auto-line-mode t)
+    (setq eat--auto-line-mode-prev-mode nil)))
+
+(defun eat-line-send-default ()
   "Send shell prompt input directly to the terminal."
   (eat-term-send-string eat--terminal (buffer-string))
   ;; If output arrives after sending the string, new output may get
@@ -5863,36 +5868,40 @@ MODE should one of:
   ;; terminal.
   (narrow-to-region (eat-term-end eat--terminal) (point-max)))
 
-(defun eat-prompt-send ()
+(defun eat-line-send ()
   "Send shell prompt input to the terminal."
-  (interactive)
   (save-excursion
     (save-restriction
       (narrow-to-region (eat-term-end eat--terminal) (point-max))
-      (funcall eat-prompt-input-send-function)
+      (funcall eat-line-input-send-function)
       (delete-region (point-min) (point-max))
-      (eat--prompt-mode -1)))
+      (eat--line-reset-input-ring-vars)
+      (setq buffer-undo-list nil)))
   (goto-char (eat-term-display-cursor eat--terminal)))
 
-(defvar eat--prompt-input-ring)
+(defvar eat--line-input-ring)
 
-(defun eat-prompt-newline ()
-  "Send shell prompt input to the terminal, with a newline."
-  (interactive)
+(defun eat-line-send-input (&optional no-newline)
+  "Send shell prompt input to the terminal.
+
+If called without any prefix argument, or if NO-NEWLINE is nil, append
+a newline to the input before sending it."
+  (interactive "P")
   (if (not (<= (eat-term-end eat--terminal) (point)))
       (call-interactively #'newline)
     (unless (= (eat-term-end eat--terminal) (point-max))
-      (unless eat--prompt-input-ring
-        (setq eat--prompt-input-ring
-              (make-ring eat-prompt-input-ring-size)))
-      (ring-insert eat--prompt-input-ring
+      (unless eat--line-input-ring
+        (setq eat--line-input-ring
+              (make-ring eat-line-input-ring-size)))
+      (ring-insert eat--line-input-ring
                    (buffer-substring-no-properties
                     (eat-term-end eat--terminal) (point-max))))
-    (goto-char (point-max))
-    (insert "\n")
-    (eat-prompt-send)))
+    (unless no-newline
+      (goto-char (point-max))
+      (insert "\n"))
+    (eat-line-send)))
 
-(defun eat-prompt-delchar-or-eof (arg)
+(defun eat-line-delchar-or-eof (arg)
   "Delete character or send shell prompt input to the terminal.
 
 ARG is the prefix arg, passed to `delete-char' when deleting
@@ -5901,15 +5910,15 @@ character."
   (if (not (= (eat-term-end eat--terminal) (point-max)))
       (delete-char arg)
     (insert "\C-d")
-    (eat-prompt-send)))
+    (eat-line-send)))
 
-(defun eat-prompt-send-interrupt ()
+(defun eat-line-send-interrupt ()
   "Clear the input and send `C-c' to the shell."
   (interactive)
   (delete-region (eat-term-end eat--terminal) (point-max))
   (goto-char (point-max))
   (insert "\C-c")
-  (eat-prompt-send))
+  (eat-line-send))
 
 
 ;;;;;; History.
@@ -5917,40 +5926,40 @@ character."
 ;; The following code in this page (or section) is adapted from
 ;; Comint source.
 
-(defvar eat--prompt-input-ring nil
+(defvar eat--line-input-ring nil
   "Ring holding the history of inputs.")
 
-(defvar eat--prompt-input-ring-index nil
+(defvar eat--line-input-ring-index nil
   "Index of last matched history element.")
 
-(defvar eat--prompt-stored-incomplete-input nil
+(defvar eat--line-stored-incomplete-input nil
   "Stored input for history cycling.")
 
-(defvar eat--prompt-matching-input-from-input-string ""
+(defvar eat--line-matching-input-from-input-string ""
   "Input previously used to match input history.")
 
-(defun eat--prompt-reset-input-ring-vars ()
+(defun eat--line-reset-input-ring-vars ()
   "Reset variable after a new shell prompt."
-  (setq eat--prompt-input-ring-index nil)
-  (setq eat--prompt-stored-incomplete-input nil)
-  (setq eat--prompt-matching-input-from-input-string ""))
+  (setq eat--line-input-ring-index nil)
+  (setq eat--line-stored-incomplete-input nil)
+  (setq eat--line-matching-input-from-input-string ""))
 
-(defun eat--prompt-populate-input-ring (hist format)
-  "Populate `eat--prompt-input-ring' from HIST in format FORMAT."
-  (setq eat--prompt-input-ring (make-ring eat-prompt-input-ring-size))
+(defun eat--line-populate-input-ring (hist format)
+  "Populate `eat--line-input-ring' from HIST in format FORMAT."
+  (setq eat--line-input-ring (make-ring eat-line-input-ring-size))
   (pcase format
     ("bash"
      (dolist (item (string-split hist "\n" 'omit-nulls))
        (when (/= (aref item 0) ?#)
-         (ring-insert eat--prompt-input-ring item))))
+         (ring-insert eat--line-input-ring item))))
     ("zsh"
      (dolist (item (string-split hist "\n" 'omit-nulls))
-       (ring-insert eat--prompt-input-ring
+       (ring-insert eat--line-input-ring
                     (string-trim item (rx ": " (zero-or-more digit)
                                           ?: (zero-or-more digit)
                                           ?\;)))))))
 
-(defun eat--prompt-ask-for-regexp-arg (prompt)
+(defun eat--line-ask-for-regexp-arg (prompt)
   "Return list of regexp and prefix arg using PROMPT."
   (let* (;; Don't clobber this.
 	 (last-command last-command)
@@ -5965,92 +5974,92 @@ character."
 	    regexp)
 	  (prefix-numeric-value current-prefix-arg))))
 
-(defun eat--prompt-search-arg (arg)
+(defun eat--line-search-arg (arg)
   "Check point, and return ARG, or one if ARG is zero."
   ;; First make sure there is a ring and that we are after the
   ;; terminal region.
   (cond ((< (point) (eat-term-end eat--terminal))
 	 (user-error "Not at command line"))
-	((or (null eat--prompt-input-ring)
-	     (ring-empty-p eat--prompt-input-ring))
+	((or (null eat--line-input-ring)
+	     (ring-empty-p eat--line-input-ring))
 	 (user-error "Empty input ring"))
 	((zerop arg)
 	 ;; ARG zero resets search from beginning, and uses ARG 1.
-	 (setq eat--prompt-input-ring-index nil)
+	 (setq eat--line-input-ring-index nil)
 	 1)
 	(t
 	 arg)))
 
-(defun eat-prompt-restore-input ()
+(defun eat-line-restore-input ()
   "Restore unfinished input."
   (interactive)
-  (when eat--prompt-input-ring-index
-    (eat--prompt-delete-input)
-    (when (> (length eat--prompt-stored-incomplete-input) 0)
-      (insert eat--prompt-stored-incomplete-input)
+  (when eat--line-input-ring-index
+    (eat--line-delete-input)
+    (when (> (length eat--line-stored-incomplete-input) 0)
+      (insert eat--line-stored-incomplete-input)
       (message "Input restored"))
-    (setq eat--prompt-input-ring-index nil)))
+    (setq eat--line-input-ring-index nil)))
 
-(defun eat--prompt-search-start (arg)
+(defun eat--line-search-start (arg)
   "Index to start a directional search, ARG indicates the direction."
-  (if eat--prompt-input-ring-index
+  (if eat--line-input-ring-index
       ;; If a search is running, offset by 1 in direction of ARG.
-      (mod (+ eat--prompt-input-ring-index (if (> arg 0) 1 -1))
-	   (ring-length eat--prompt-input-ring))
+      (mod (+ eat--line-input-ring-index (if (> arg 0) 1 -1))
+	   (ring-length eat--line-input-ring))
     ;; For a new search, start from end if ARG is negative, or from
     ;; beginning otherwise.
     (if (> arg 0)
 	0
-      (1- (ring-length eat--prompt-input-ring)))))
+      (1- (ring-length eat--line-input-ring)))))
 
-(defun eat--prompt-prev-input-string (arg)
+(defun eat--line-prev-input-string (arg)
   "Return the string ARG places along the input ring.
-Moves relative to `eat--prompt-input-ring-index'."
-  (ring-ref eat--prompt-input-ring
-            (if eat--prompt-input-ring-index
-		(mod (+ arg eat--prompt-input-ring-index)
-		     (ring-length eat--prompt-input-ring))
+Moves relative to `eat--line-input-ring-index'."
+  (ring-ref eat--line-input-ring
+            (if eat--line-input-ring-index
+		(mod (+ arg eat--line-input-ring-index)
+		     (ring-length eat--line-input-ring))
 	      arg)))
 
-(defun eat-prompt-previous-input (arg)
+(defun eat-line-previous-input (arg)
   "Cycle backwards through input history, saving input.
 
 Negative ARG means search forward instead."
   (interactive "*p")
-  (if (and eat--prompt-input-ring-index
+  (if (and eat--line-input-ring-index
            ;; Are we leaving the "end" of the ring?
 	   (or (and (< arg 0)		; going down
-		    (eq eat--prompt-input-ring-index 0))
+		    (eq eat--line-input-ring-index 0))
 	       (and (> arg 0)		; going up
-		    (eq eat--prompt-input-ring-index
-		        (1- (ring-length eat--prompt-input-ring)))))
-	   eat--prompt-stored-incomplete-input)
-      (eat-prompt-restore-input)
-    (eat-prompt-previous-matching-input "." arg)))
+		    (eq eat--line-input-ring-index
+		        (1- (ring-length eat--line-input-ring)))))
+	   eat--line-stored-incomplete-input)
+      (eat-line-restore-input)
+    (eat-line-previous-matching-input "." arg)))
 
-(defun eat-prompt-next-input (arg)
+(defun eat-line-next-input (arg)
   "Cycle forwards through input history, saving input.
 
 Negative ARG means search backward instead."
   (interactive "*p")
-  (eat-prompt-previous-input (- arg)))
+  (eat-line-previous-input (- arg)))
 
-(defun eat--prompt-prev-matching-input-str (regexp arg)
+(defun eat--line-prev-matching-input-str (regexp arg)
   "Return the string matching REGEXP ARG places along the input ring.
-Moves relative to `eat--prompt-input-ring-index'."
-  (let* ((pos (eat--prompt-prev-matching-input-str-pos regexp arg)))
-    (if pos (ring-ref eat--prompt-input-ring pos))))
+Moves relative to `eat--line-input-ring-index'."
+  (let* ((pos (eat--line-prev-matching-input-str-pos regexp arg)))
+    (if pos (ring-ref eat--line-input-ring pos))))
 
-(defun eat--prompt-prev-matching-input-str-pos
+(defun eat--line-prev-matching-input-str-pos
     (regexp arg &optional start)
   "Return the index matching REGEXP ARG places along the input ring.
-Moves relative to START, or `eat--prompt-input-ring-index'."
-  (when (or (not (ring-p eat--prompt-input-ring))
-	    (ring-empty-p eat--prompt-input-ring))
+Moves relative to START, or `eat--line-input-ring-index'."
+  (when (or (not (ring-p eat--line-input-ring))
+	    (ring-empty-p eat--line-input-ring))
     (user-error "No history"))
-  (let* ((len (ring-length eat--prompt-input-ring))
+  (let* ((len (ring-length eat--line-input-ring))
 	 (motion (if (> arg 0) 1 -1))
-	 (n (mod (- (or start (eat--prompt-search-start arg)) motion)
+	 (n (mod (- (or start (eat--line-search-start arg)) motion)
                  len))
 	 (tried-each-ring-item nil)
 	 (prev nil))
@@ -6063,22 +6072,22 @@ Moves relative to START, or `eat--prompt-input-ring-index'."
       (while (and (< n len) (not tried-each-ring-item)
 		  (not (string-match regexp
                                      (ring-ref
-                                      eat--prompt-input-ring n))))
+                                      eat--line-input-ring n))))
 	(setq n (mod (+ n motion) len))
 	;; If we have gone all the way around in this search.
 	(setq tried-each-ring-item (= n prev)))
       (setq arg (if (> arg 0) (1- arg) (1+ arg))))
     ;; Now that we know which ring element to use, if we found it,
     ;; return that.
-    (when (string-match regexp (ring-ref eat--prompt-input-ring n))
+    (when (string-match regexp (ring-ref eat--line-input-ring n))
       n)))
 
-(defun eat--prompt-delete-input ()
+(defun eat--line-delete-input ()
   "Delete all input between accumulation or process mark and point."
   ;; Can't use kill-region as it sets `this-command'.
   (delete-region (eat-term-end eat--terminal) (point-max)))
 
-(defun eat-prompt-previous-matching-input (regexp n &optional restore)
+(defun eat-line-previous-matching-input (regexp n &optional restore)
   "Search backwards through input history for match for REGEXP.
 
 \(Previous history elements are earlier commands.)
@@ -6086,43 +6095,43 @@ With prefix argument N, search for Nth previous match.
 If N is negative, find the next or Nth next match.
 
 If RESTORE is non-nil, restore input in case of wrap."
-  (interactive (eat--prompt-ask-for-regexp-arg
+  (interactive (eat--line-ask-for-regexp-arg
                 "Previous input matching (regexp): "))
-  (setq n (eat--prompt-search-arg n))
-  (let ((pos (eat--prompt-prev-matching-input-str-pos regexp n)))
+  (setq n (eat--line-search-arg n))
+  (let ((pos (eat--line-prev-matching-input-str-pos regexp n)))
     ;; Has a match been found?
     (if (null pos)
 	(user-error "Not found")
-      (if (and eat--prompt-input-ring-index
+      (if (and eat--line-input-ring-index
                restore
                (or (and (< n 0)
-                        (< eat--prompt-input-ring-index pos))
+                        (< eat--line-input-ring-index pos))
                    (and (> n 0)
-                        (> eat--prompt-input-ring-index pos))))
+                        (> eat--line-input-ring-index pos))))
           ;; We have a wrap; restore contents.
-          (eat-prompt-restore-input)
+          (eat-line-restore-input)
         ;; If leaving the edit line, save partial input.
-        (if (null eat--prompt-input-ring-index) ;not yet on ring
-	    (setq eat--prompt-stored-incomplete-input
+        (if (null eat--line-input-ring-index) ;not yet on ring
+	    (setq eat--line-stored-incomplete-input
 		  (buffer-substring-no-properties
                    (eat-term-end eat--terminal) (point-max))))
-        (setq eat--prompt-input-ring-index pos)
+        (setq eat--line-input-ring-index pos)
         (unless isearch-mode
 	  (let ((message-log-max nil))	; Do not write to *Messages*.
 	    (message "History item: %d" (1+ pos))))
-        (eat--prompt-delete-input)
-        (insert (ring-ref eat--prompt-input-ring pos))))))
+        (eat--line-delete-input)
+        (insert (ring-ref eat--line-input-ring pos))))))
 
-(defun eat-prompt-next-matching-input (regexp n)
+(defun eat-line-next-matching-input (regexp n)
   "Search forwards through input history for match for REGEXP.
 \(Later history elements are more recent commands.)
 With prefix argument N, search for Nth following match.
 If N is negative, find the previous or Nth previous match."
-  (interactive (eat--prompt-ask-for-regexp-arg
+  (interactive (eat--line-ask-for-regexp-arg
                 "Next input matching (regexp): "))
-  (eat-prompt-previous-matching-input regexp (- n)))
+  (eat-line-previous-matching-input regexp (- n)))
 
-(defun eat-prompt-previous-matching-input-from-input (n)
+(defun eat-line-previous-matching-input-from-input (n)
   "Search backwards through input history for match for current input.
 \(Previous history elements are earlier commands.)
 With prefix argument N, search for Nth previous match.
@@ -6130,49 +6139,49 @@ If N is negative, search forwards for the -Nth following match."
   (interactive "p")
   (let ((opoint (point)))
     (unless (memq last-command
-                  '(eat-prompt-previous-matching-input-from-input
-		    eat-prompt-next-matching-input-from-input))
+                  '(eat-line-previous-matching-input-from-input
+		    eat-line-next-matching-input-from-input))
       ;; Starting a new search
-      (setq eat--prompt-matching-input-from-input-string
+      (setq eat--line-matching-input-from-input-string
 	    (buffer-substring (eat-term-end eat--terminal)
                               (point-max)))
-      (setq eat--prompt-input-ring-index nil))
-    (eat-prompt-previous-matching-input
+      (setq eat--line-input-ring-index nil))
+    (eat-line-previous-matching-input
      (concat "^" (regexp-quote
-                  eat--prompt-matching-input-from-input-string))
+                  eat--line-matching-input-from-input-string))
      n t)
-    (when (eq eat-prompt-move-point-for-matching-input 'after-input)
+    (when (eq eat-line-move-point-for-matching-input 'after-input)
       (goto-char opoint))))
 
-(defun eat-prompt-next-matching-input-from-input (n)
+(defun eat-line-next-matching-input-from-input (n)
   "Search forwards through input history for match for current input.
 \(Following history elements are more recent commands.)
 With prefix argument N, search for Nth following match.
 If N is negative, search backwards for the -Nth previous match."
   (interactive "p")
-  (eat-prompt-previous-matching-input-from-input (- n)))
+  (eat-line-previous-matching-input-from-input (- n)))
 
-(defun eat-prompt-find-input ()
+(defun eat-line-find-input ()
   "Find and insert input history using minibuffer."
   (declare (interactive-only t))
   (interactive)
-  (when (or (not (ring-p eat--prompt-input-ring))
-	    (ring-empty-p eat--prompt-input-ring))
+  (when (or (not (ring-p eat--line-input-ring))
+	    (ring-empty-p eat--line-input-ring))
     (user-error "No history"))
   (let ((str (completing-read
               "Input: "
-              (seq-uniq (ring-elements eat--prompt-input-ring)) nil
+              (seq-uniq (ring-elements eat--line-input-ring)) nil
               nil (buffer-substring (eat-term-end eat--terminal)
                                     (point-max))))
         (i 0)
         (pos nil))
-    (while (and (< i (ring-length eat--prompt-input-ring)) (not pos))
-      (when (equal (ring-ref eat--prompt-input-ring i) str)
+    (while (and (< i (ring-length eat--line-input-ring)) (not pos))
+      (when (equal (ring-ref eat--line-input-ring i) str)
         (setq pos i))
       (cl-incf i))
     (when pos
-      (setq eat--prompt-input-ring-index pos))
-    (eat--prompt-delete-input)
+      (setq eat--line-input-ring-index pos))
+    (eat--line-delete-input)
     (insert str)))
 
 
@@ -6259,12 +6268,12 @@ END if it's safe to do so."
           eat--shell-prompt-begin
           eat--shell-prompt-mark
           eat--shell-prompt-mark-overlays
-          eat--inhibit-prompt-mode
-          eat--prompt-mode-previous-mode
-          eat--prompt-input-ring
-          eat--prompt-input-ring-index
-          eat--prompt-stored-incomplete-input
-          eat--prompt-matching-input-from-input-string
+          eat--inhibit-auto-line-mode
+          eat--auto-line-mode-prev-mode
+          eat--line-input-ring
+          eat--line-input-ring-index
+          eat--line-stored-incomplete-input
+          eat--line-matching-input-from-input-string
           eat--pending-input-chunks
           eat--process-input-queue-timer
           eat--pending-output-chunks
@@ -6273,8 +6282,6 @@ END if it's safe to do so."
           eat--shell-prompt-annotation-correction-timer))
   ;; This is intended; input methods don't work on read-only buffers.
   (setq buffer-read-only nil)
-  (unless eat-enable-native-shell-prompt-editing
-    (setq buffer-undo-list t))
   (setq eat--synchronize-scroll-function #'eat--synchronize-scroll)
   (setq filter-buffer-substring-function
         #'eat--filter-buffer-substring)
@@ -6290,13 +6297,14 @@ END if it's safe to do so."
                  (:propertize
                   "semi-char"
                   help-echo "mouse-1: Switch to char mode, \
-mouse-3: Switch to emacs mode"
+mouse-2: Switch to line mode, mouse-3: Switch to emacs mode"
                   mouse-face mode-line-highlight
                   local-map
                   (keymap
                    (mode-line
                     . (keymap
                        (down-mouse-1 . eat-char-mode)
+                       (down-mouse-2 . eat-line-mode)
                        (down-mouse-3 . eat-emacs-mode)))))
                  "]"))
               (eat--char-mode
@@ -6304,19 +6312,20 @@ mouse-3: Switch to emacs mode"
                  (:propertize
                   "char"
                   help-echo "mouse-1: Switch to semi-char mode, \
-mouse-3: Switch to emacs mode"
+mouse-2: Switch to line mode, mouse-3: Switch to emacs mode"
                   mouse-face mode-line-highlight
                   local-map
                   (keymap
                    (mode-line
                     . (keymap
                        (down-mouse-1 . eat-semi-char-mode)
+                       (down-mouse-2 . eat-line-mode)
                        (down-mouse-3 . eat-emacs-mode)))))
                  "]"))
-              (eat--prompt-mode
+              (eat--line-mode
                '("["
                  (:propertize
-                  "prompt"
+                  "line"
                   help-echo "mouse-1: Switch to semi char mode, \
 mouse-2: Switch to emacs mode, mouse-3: Switch to char mode"
                   mouse-face mode-line-highlight
@@ -6340,6 +6349,7 @@ mouse-3: Switch to char mode"
                    (mode-line
                     . (keymap
                        (down-mouse-1 . eat-semi-char-mode)
+                       (down-mouse-2 . eat-line-mode)
                        (down-mouse-3 . eat-char-mode)))))
                  "]")))))
           ":%s"))
@@ -6462,7 +6472,7 @@ OS's."
           (let ((inhibit-read-only t)
                 (inhibit-modification-hooks t)
                 ;; Don't let `undo' mess up with the terminal.
-                (buffer-undo-list buffer-undo-list))
+                (buffer-undo-list t))
             (when eat--process-output-queue-timer
               (cancel-timer eat--process-output-queue-timer))
             (setq eat--output-queue-first-chunk-time nil)
@@ -6546,9 +6556,8 @@ to it."
                 (setq eat--shell-prompt-begin nil)
                 (setq eat--shell-prompt-mark nil)
                 (setq eat--shell-prompt-mark-overlays nil))
-              (when eat--prompt-mode
-                (setq eat--prompt-mode-previous-mode 'dont-restore)
-                (eat--prompt-mode -1)
+              (when eat--line-mode
+                (eat--line-mode -1)
                 (delete-region (eat-term-end eat--terminal)
                                (point-max)))
               (eat-emacs-mode)
