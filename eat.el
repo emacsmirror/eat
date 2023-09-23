@@ -6001,6 +6001,23 @@ character."
                                           ?: (zero-or-more digit)
                                           ?\;)))))))
 
+(defun eat-line-load-input-history-from-file (file format)
+  "Load input history from FILE.
+
+FORMAT is the format of FILE."
+  (interactive
+   (let ((file (read-file-name "History file: ")))
+     (list file (completing-read
+                 "History file format: " '("bash" "zsh")
+                 nil t (pcase (file-name-nondirectory file)
+                         (".bash_history" "bash")
+                         (".zsh_history" "zsh"))))))
+  (let ((str nil))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (setq str (buffer-string)))
+    (eat--line-populate-input-ring str format)))
+
 (defun eat--line-ask-for-regexp-arg (prompt)
   "Return list of regexp and prefix arg using PROMPT."
   (let* (;; Don't clobber this.
