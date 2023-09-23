@@ -215,6 +215,22 @@ end of the current logical (not visual) line after insertion."
                 (const :tag "Move to end of line" end-of-line))
   :group 'eat-ui)
 
+(defcustom eat-line-input-history-isearch nil
+  "Non-nil to Isearch in input history only, not in the terminal.
+
+If t, usual Isearch keys like \\[isearch-backward] and \
+\\[isearch-backward-regexp] in Eat buffer search in
+the input history.  If `dwim', Isearch keys search in the input
+history only when initial point position is on input line.  When
+starting Isearch from other parts of the Eat buffer, they search in
+the Eat buffer.  If nil, Isearch operates on the whole Eat buffer."
+  :type '(choice (const :tag "Don't search in input history" nil)
+                 (const :tag "When point is on input line initially, \
+search history"
+                        dwim)
+                 (const :tag "Always search in input history" t))
+  :group 'eat-ui)
+
 (defcustom eat-line-input-send-function #'eat-line-send-default
   "Function to send the shell prompt input.
 
@@ -5710,7 +5726,8 @@ EVENT is the mouse event."
     (define-key map [?\M-n] #'eat-line-next-input)
     (define-key map [C-up] #'eat-line-previous-input)
     (define-key map [C-down] #'eat-line-next-input)
-    (define-key map [?\M-r] #'eat-line-previous-matching-input)
+    (define-key map [?\M-r]
+                #'eat-line-history-isearch-backward-regexp)
     (define-key map [?\C-c ?\C-r] #'eat-line-find-input)
     (define-key map [?\C-c ?\M-r]
                 #'eat-line-previous-matching-input-from-input)
@@ -5846,6 +5863,8 @@ MODE should one of:
 (defun eat-line-mode ()
   "Switch to line mode."
   (interactive)
+  (unless eat--terminal
+    (error "Process not running"))
   (eat--line-mode +1)
   (eat--semi-char-mode -1)
   (eat--char-mode -1)
@@ -5955,6 +5974,12 @@ character."
 (defvar eat--line-matching-input-from-input-string ""
   "Input previously used to match input history.")
 
+(defvar eat--line-history-isearch-message-overlay nil
+  "Overlay to show Isearch prompt, replacing the shell prompt.")
+
+(defvar eat--saved-line-input-history-isearch 'not-saved
+  "Saved value of `eat-line-input-history-isearch'.")
+
 (defun eat--line-reset-input-ring-vars ()
   "Reset variable after a new shell prompt."
   (setq eat--line-input-ring-index nil)
@@ -6011,7 +6036,7 @@ character."
   "Restore unfinished input."
   (interactive)
   (when eat--line-input-ring-index
-    (eat--line-delete-input)
+    (delete-region (eat-term-end eat--terminal) (point-max))
     (when (> (length eat--line-stored-incomplete-input) 0)
       (insert eat--line-stored-incomplete-input)
       (message "Input restored"))
@@ -6099,11 +6124,6 @@ Moves relative to START, or `eat--line-input-ring-index'."
     (when (string-match regexp (ring-ref eat--line-input-ring n))
       n)))
 
-(defun eat--line-delete-input ()
-  "Delete all input between accumulation or process mark and point."
-  ;; Can't use kill-region as it sets `this-command'.
-  (delete-region (eat-term-end eat--terminal) (point-max)))
-
 (defun eat-line-previous-matching-input (regexp n &optional restore)
   "Search backwards through input history for match for REGEXP.
 
@@ -6136,7 +6156,7 @@ If RESTORE is non-nil, restore input in case of wrap."
         (unless isearch-mode
           (let ((message-log-max nil))  ; Do not write to *Messages*.
             (message "History item: %d" (1+ pos))))
-        (eat--line-delete-input)
+        (delete-region (eat-term-end eat--terminal) (point-max))
         (insert (ring-ref eat--line-input-ring pos))))))
 
 (defun eat-line-next-matching-input (regexp n)
@@ -6198,8 +6218,212 @@ If N is negative, search backwards for the -Nth previous match."
       (cl-incf i))
     (when pos
       (setq eat--line-input-ring-index pos))
-    (eat--line-delete-input)
+    (delete-region (eat-term-end eat--terminal) (point-max))
     (insert str)))
+
+(defun eat-line-history-isearch-backward ()
+  "Search for a string backward in input history using Isearch."
+  (interactive)
+  (setq eat--saved-line-input-history-isearch
+        eat-line-input-history-isearch)
+  (setq eat-line-input-history-isearch t)
+  (isearch-backward nil t))
+
+(defun eat-line-history-isearch-backward-regexp ()
+  "Search for a regular expression backward in input history using Isearch."
+  (interactive)
+  (setq eat--saved-line-input-history-isearch
+        eat-line-input-history-isearch)
+  (setq eat-line-input-history-isearch t)
+  (isearch-backward-regexp nil t))
+
+(defun eat--line-history-isearch-setup ()
+  "Set up Eat buffer for using Isearch to search the input history."
+  (when (or (eq eat-line-input-history-isearch t)
+            (and (eq eat-line-input-history-isearch 'dwim)
+                 (>= (point) (eat-term-end eat--terminal))))
+    (setq isearch-message-prefix-add "history ")
+    (setq isearch-search-fun-function
+          #'eat--line-history-isearch-search)
+    (setq isearch-message-function
+          #'eat--line-history-isearch-message)
+    (setq isearch-wrap-function #'eat--line-history-isearch-wrap)
+    (setq isearch-push-state-function
+          #'eat--line-history-isearch-push-state)
+    (make-local-variable 'isearch-lazy-count)
+    (setq isearch-lazy-count nil)
+    (add-hook 'isearch-mode-end-hook
+              'eat--line-history-isearch-end nil t)))
+
+(defun eat--line-history-isearch-end ()
+  "Clean up after terminating Isearch."
+  (when eat--line-history-isearch-message-overlay
+    (delete-overlay eat--line-history-isearch-message-overlay))
+  (setq isearch-message-prefix-add nil)
+  (setq isearch-search-fun-function 'isearch-search-fun-default)
+  (setq isearch-message-function nil)
+  (setq isearch-wrap-function nil)
+  (setq isearch-push-state-function nil)
+  ;; Force isearch to not change mark.
+  (setq isearch-opoint (point))
+  (kill-local-variable 'isearch-lazy-count)
+  (remove-hook 'isearch-mode-end-hook
+               'eat--line-history-isearch-end t)
+  (unless (or isearch-suspended
+              (eq eat--saved-line-input-history-isearch 'not-saved))
+    (setq eat-line-input-history-isearch
+          eat--saved-line-input-history-isearch)
+    (setq eat--saved-line-input-history-isearch 'not-saved)))
+
+(defun eat--line-goto-input (pos)
+  "Put input history item of the absolute history position POS."
+  ;; If leaving the edit line, save partial unfinished input.
+  (when (null eat--line-input-ring-index)
+    (setq eat--line-stored-incomplete-input
+          (buffer-substring-no-properties
+           (eat-term-end eat--terminal) (point-max))))
+  (setq eat--line-input-ring-index pos)
+  (delete-region (eat-term-end eat--terminal) (point-max))
+  (if (and pos (not (ring-empty-p eat--line-input-ring)))
+      (insert (ring-ref eat--line-input-ring pos))
+    ;; Restore partial unfinished input.
+    (when (> (length eat--line-stored-incomplete-input) 0)
+      (insert eat--line-stored-incomplete-input))))
+
+(defun eat--line-history-isearch-search ()
+  "Return the proper search function, for Isearch in input history."
+  (lambda (string bound noerror)
+    (let ((search-fun (isearch-search-fun-default))
+          found)
+      ;; Avoid lazy-highlighting matches in the input line and in the
+      ;; output when searching forward.  Lazy-highlight calls this
+      ;; lambda with the bound arg, so skip the prompt and the output.
+      (when (and bound isearch-forward
+                 (< (point) (eat-term-end eat--terminal)))
+        (goto-char (eat-term-end eat--terminal)))
+      (or
+       ;; 1. First try searching in the initial input line
+       (funcall search-fun string (if isearch-forward
+                                      bound
+                                    (eat-term-end eat--terminal))
+                noerror)
+       ;; 2. If the above search fails, start putting next/prev
+       ;; history elements in the input line successively, and search
+       ;; the string in them.  Do this only when bound is nil
+       ;; (i.e. not while lazy-highlighting search strings in the
+       ;; current input line).
+       (unless bound
+         (condition-case nil
+             (progn
+               (while (not found)
+                 (cond
+                  (isearch-forward
+                   ;; Signal an error here explicitly, because
+                   ;; `eat-line-next-input' doesn't signal an
+                   ;; error.
+                   (when (null eat--line-input-ring-index)
+                     (error "End of history; no next item"))
+                   (eat-line-next-input 1)
+                   (goto-char (eat-term-end eat--terminal)))
+                  (t
+                   ;; Signal an error here explicitly, because
+                   ;; `eat-line-previous-input' doesn't signal an
+                   ;; error.
+                   (when (eq eat--line-input-ring-index
+                             (1- (ring-length eat--line-input-ring)))
+                     (error
+                      "Beginning of history; no preceding item"))
+                   (eat-line-previous-input 1)
+                   (goto-char (point-max))))
+                 (setq isearch-barrier (point))
+                 (setq isearch-opoint (point))
+                 ;; After putting the next/prev history element,
+                 ;; search the string in them again, until
+                 ;; `eat-line-next-input' or `eat-line-previous-input'
+                 ;; raises an error at the beginning/end of history.
+                 (setq found
+                       (funcall search-fun string
+                                (unless isearch-forward
+                                  ;; For backward search, don't search
+                                  ;; in the terminal region
+                                  (eat-term-end eat--terminal))
+                                noerror)))
+               ;; Return point of the new search result
+               (point))
+           ;; Return nil on the error "no next/preceding item"
+           (error nil)))))))
+
+(defun eat--line-history-isearch-message (&optional c-q-hack ellipsis)
+  "Display the input history search prompt.
+
+If there are no search errors, this function displays an overlay with
+the Isearch prompt which replaces the original shell prompt.
+Otherwise, it displays the standard Isearch message returned from
+the function `isearch-message'.
+
+C-Q-HACK and ELLIPSIS are same as in function `isearch-message', which
+see."
+  (if (not (and isearch-success (not isearch-error)))
+      ;; Use standard function `isearch-message' when not in input
+      ;; line, or search fails, or has an error (like incomplete
+      ;; regexp).  This function displays isearch message in the echo
+      ;; area, so it's possible to see what is wrong in the search
+      ;; string.
+      (isearch-message c-q-hack ellipsis)
+    ;; Otherwise, put the overlay with the standard Isearch prompt
+    ;; over the shell prompt.
+    (if (overlayp eat--line-history-isearch-message-overlay)
+        (move-overlay eat--line-history-isearch-message-overlay
+                      (save-excursion
+                        (goto-char (eat-term-end eat--terminal))
+                        (forward-line 0)
+                        (point))
+                      (eat-term-end eat--terminal))
+      (setq eat--line-history-isearch-message-overlay
+            (make-overlay (save-excursion
+                            (goto-char (eat-term-end eat--terminal))
+                            (forward-line 0)
+                            (point))
+                          (eat-term-end eat--terminal)))
+      (overlay-put eat--line-history-isearch-message-overlay
+                   'evaporate t))
+    (overlay-put eat--line-history-isearch-message-overlay
+                 'display (isearch-message-prefix
+                           ellipsis isearch-nonincremental))
+    (if (and eat--line-input-ring-index (not ellipsis))
+        ;; Display the current history index.
+        (message "History item: %d" (1+ eat--line-input-ring-index))
+      ;; Or clear a previous isearch message.
+      (message ""))))
+
+(defun eat--line-history-isearch-wrap ()
+  "Wrap the input history search when search fails.
+
+Move point to the first history element for a forward search,
+or to the last history element for a backward search."
+  ;; When `eat--line-history-isearch-search' fails on reaching the
+  ;; beginning/end of the history, wrap the search to the first/last
+  ;; input history element.
+  (if isearch-forward
+      (eat--line-goto-input (1- (ring-length eat--line-input-ring)))
+    (eat--line-goto-input nil))
+  (goto-char (if isearch-forward
+                 (eat-term-end eat--terminal)
+               (point-max))))
+
+(defun eat--line-history-isearch-push-state ()
+  "Save a function restoring the state of input history search.
+
+Save `eat--line-input-ring-index' to the additional state parameter
+in the search status stack."
+  (let ((index eat--line-input-ring-index))
+    (lambda (cmd)
+      (eat--line-history-isearch-pop-state cmd index))))
+
+(defun eat--line-history-isearch-pop-state (_cmd hist-pos)
+  "Restore the input history search state.
+Go to the history element by the absolute history position HIST-POS."
+  (eat--line-goto-input hist-pos))
 
 
 ;;;;; Major Mode.
@@ -6291,6 +6515,11 @@ END if it's safe to do so."
           eat--line-input-ring-index
           eat--line-stored-incomplete-input
           eat--line-matching-input-from-input-string
+          eat--line-history-isearch-message-overlay
+          isearch-search-fun-function
+          isearch-message-function
+          isearch-wrap-function
+          isearch-push-state-function
           eat--pending-input-chunks
           eat--process-input-queue-timer
           eat--pending-output-chunks
@@ -6304,6 +6533,7 @@ END if it's safe to do so."
         #'eat--filter-buffer-substring)
   (setq bidi-paragraph-direction 'left-to-right)
   (setq eat--mouse-grabbing-type nil)
+  (add-hook 'isearch-mode-hook 'eat--line-history-isearch-setup nil t)
   (setq mode-line-process
         '(""
           (:eval
