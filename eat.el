@@ -5979,33 +5979,33 @@ character."
 (defun eat--line-ask-for-regexp-arg (prompt)
   "Return list of regexp and prefix arg using PROMPT."
   (let* (;; Don't clobber this.
-	 (last-command last-command)
-	 (regexp (read-from-minibuffer
+         (last-command last-command)
+         (regexp (read-from-minibuffer
                   prompt nil nil nil
-		  'minibuffer-history-search-history)))
+                  'minibuffer-history-search-history)))
     ;; If the user didn't enter anything, nothing is added to m-h-s-h.
     ;; Use the previous search regexp, if there is one.
     (list (if (string-equal regexp "")
               (or (car minibuffer-history-search-history)
                   regexp)
-	    regexp)
-	  (prefix-numeric-value current-prefix-arg))))
+            regexp)
+          (prefix-numeric-value current-prefix-arg))))
 
 (defun eat--line-search-arg (arg)
   "Check point, and return ARG, or one if ARG is zero."
   ;; First make sure there is a ring and that we are after the
   ;; terminal region.
   (cond ((< (point) (eat-term-end eat--terminal))
-	 (user-error "Not at command line"))
-	((or (null eat--line-input-ring)
-	     (ring-empty-p eat--line-input-ring))
-	 (user-error "Empty input ring"))
-	((zerop arg)
-	 ;; ARG zero resets search from beginning, and uses ARG 1.
-	 (setq eat--line-input-ring-index nil)
-	 1)
-	(t
-	 arg)))
+         (user-error "Not at command line"))
+        ((or (null eat--line-input-ring)
+             (ring-empty-p eat--line-input-ring))
+         (user-error "Empty input ring"))
+        ((zerop arg)
+         ;; ARG zero resets search from beginning, and uses ARG 1.
+         (setq eat--line-input-ring-index nil)
+         1)
+        (t
+         arg)))
 
 (defun eat-line-restore-input ()
   "Restore unfinished input."
@@ -6022,11 +6022,11 @@ character."
   (if eat--line-input-ring-index
       ;; If a search is running, offset by 1 in direction of ARG.
       (mod (+ eat--line-input-ring-index (if (> arg 0) 1 -1))
-	   (ring-length eat--line-input-ring))
+           (ring-length eat--line-input-ring))
     ;; For a new search, start from end if ARG is negative, or from
     ;; beginning otherwise.
     (if (> arg 0)
-	0
+        0
       (1- (ring-length eat--line-input-ring)))))
 
 (defun eat--line-prev-input-string (arg)
@@ -6034,9 +6034,9 @@ character."
 Moves relative to `eat--line-input-ring-index'."
   (ring-ref eat--line-input-ring
             (if eat--line-input-ring-index
-		(mod (+ arg eat--line-input-ring-index)
-		     (ring-length eat--line-input-ring))
-	      arg)))
+                (mod (+ arg eat--line-input-ring-index)
+                     (ring-length eat--line-input-ring))
+              arg)))
 
 (defun eat-line-previous-input (arg)
   "Cycle backwards through input history, saving input.
@@ -6045,12 +6045,12 @@ Negative ARG means search forward instead."
   (interactive "*p")
   (if (and eat--line-input-ring-index
            ;; Are we leaving the "end" of the ring?
-	   (or (and (< arg 0)		; going down
-		    (eq eat--line-input-ring-index 0))
-	       (and (> arg 0)		; going up
-		    (eq eat--line-input-ring-index
-		        (1- (ring-length eat--line-input-ring)))))
-	   eat--line-stored-incomplete-input)
+           (or (and (< arg 0)           ; going down
+                    (eq eat--line-input-ring-index 0))
+               (and (> arg 0)           ; going up
+                    (eq eat--line-input-ring-index
+                        (1- (ring-length eat--line-input-ring)))))
+           eat--line-stored-incomplete-input)
       (eat-line-restore-input)
     (eat-line-previous-matching-input "." arg)))
 
@@ -6072,14 +6072,14 @@ Moves relative to `eat--line-input-ring-index'."
   "Return the index matching REGEXP ARG places along the input ring.
 Moves relative to START, or `eat--line-input-ring-index'."
   (when (or (not (ring-p eat--line-input-ring))
-	    (ring-empty-p eat--line-input-ring))
+            (ring-empty-p eat--line-input-ring))
     (user-error "No history"))
   (let* ((len (ring-length eat--line-input-ring))
-	 (motion (if (> arg 0) 1 -1))
-	 (n (mod (- (or start (eat--line-search-start arg)) motion)
+         (motion (if (> arg 0) 1 -1))
+         (n (mod (- (or start (eat--line-search-start arg)) motion)
                  len))
-	 (tried-each-ring-item nil)
-	 (prev nil))
+         (tried-each-ring-item nil)
+         (prev nil))
     ;; Do the whole search as many times as the argument says.
     (while (and (/= arg 0) (not tried-each-ring-item))
       ;; Step once.
@@ -6087,12 +6087,12 @@ Moves relative to START, or `eat--line-input-ring-index'."
       (setq n (mod (+ n motion) len))
       ;; If we haven't reached a match, step some more.
       (while (and (< n len) (not tried-each-ring-item)
-		  (not (string-match regexp
+                  (not (string-match regexp
                                      (ring-ref
                                       eat--line-input-ring n))))
-	(setq n (mod (+ n motion) len))
-	;; If we have gone all the way around in this search.
-	(setq tried-each-ring-item (= n prev)))
+        (setq n (mod (+ n motion) len))
+        ;; If we have gone all the way around in this search.
+        (setq tried-each-ring-item (= n prev)))
       (setq arg (if (> arg 0) (1- arg) (1+ arg))))
     ;; Now that we know which ring element to use, if we found it,
     ;; return that.
@@ -6118,7 +6118,7 @@ If RESTORE is non-nil, restore input in case of wrap."
   (let ((pos (eat--line-prev-matching-input-str-pos regexp n)))
     ;; Has a match been found?
     (if (null pos)
-	(user-error "Not found")
+        (user-error "Not found")
       (if (and eat--line-input-ring-index
                restore
                (or (and (< n 0)
@@ -6129,13 +6129,13 @@ If RESTORE is non-nil, restore input in case of wrap."
           (eat-line-restore-input)
         ;; If leaving the edit line, save partial input.
         (if (null eat--line-input-ring-index) ;not yet on ring
-	    (setq eat--line-stored-incomplete-input
-		  (buffer-substring-no-properties
+            (setq eat--line-stored-incomplete-input
+                  (buffer-substring-no-properties
                    (eat-term-end eat--terminal) (point-max))))
         (setq eat--line-input-ring-index pos)
         (unless isearch-mode
-	  (let ((message-log-max nil))	; Do not write to *Messages*.
-	    (message "History item: %d" (1+ pos))))
+          (let ((message-log-max nil))  ; Do not write to *Messages*.
+            (message "History item: %d" (1+ pos))))
         (eat--line-delete-input)
         (insert (ring-ref eat--line-input-ring pos))))))
 
@@ -6157,10 +6157,10 @@ If N is negative, search forwards for the -Nth following match."
   (let ((opoint (point)))
     (unless (memq last-command
                   '(eat-line-previous-matching-input-from-input
-		    eat-line-next-matching-input-from-input))
+                    eat-line-next-matching-input-from-input))
       ;; Starting a new search
       (setq eat--line-matching-input-from-input-string
-	    (buffer-substring (eat-term-end eat--terminal)
+            (buffer-substring (eat-term-end eat--terminal)
                               (point-max)))
       (setq eat--line-input-ring-index nil))
     (eat-line-previous-matching-input
@@ -6183,7 +6183,7 @@ If N is negative, search backwards for the -Nth previous match."
   (declare (interactive-only t))
   (interactive)
   (when (or (not (ring-p eat--line-input-ring))
-	    (ring-empty-p eat--line-input-ring))
+            (ring-empty-p eat--line-input-ring))
     (user-error "No history"))
   (let ((str (completing-read
               "Input: "
@@ -6765,11 +6765,11 @@ DISPLAY-BUFFER-FN is the function to display the buffer."
         (buffer
          (cond
           ((numberp arg)
-	   (get-buffer-create (format "%s<%d>" eat-buffer-name arg)))
-	  (arg
-	   (generate-new-buffer eat-buffer-name))
-	  (t
-	   (get-buffer-create eat-buffer-name)))))
+           (get-buffer-create (format "%s<%d>" eat-buffer-name arg)))
+          (arg
+           (generate-new-buffer eat-buffer-name))
+          (t
+           (get-buffer-create eat-buffer-name)))))
     (with-current-buffer buffer
       (unless (eq major-mode #'eat-mode)
         (eat-mode))
