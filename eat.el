@@ -191,6 +191,40 @@ FUNCTION      Call FUNCTION with the command and arguments (using
   :group 'eat-ui
   :group 'eat-eshell)
 
+(defcustom eat-line-input-ring-size 1000
+  "Number of input history items to keep."
+  :type 'natnum
+  :group 'eat-ui)
+
+(defcustom eat-line-auto-move-to-input t
+  "Non-nil means move to input line when inserting characters."
+  :type 'boolean
+  :group 'eat-ui)
+
+(defcustom eat-line-move-point-for-matching-input 'after-input
+  "Controls where to place point after matching input.
+
+\\<eat-line-mode-map>This influences the commands \
+\\[eat-line-previous-matching-input-from-input] and \
+\\[eat-line-next-matching-input-from-input].
+If `after-input', point will be positioned after the input typed
+by the user, but before the rest of the history entry that has
+been inserted.  If `end-of-line', point will be positioned at the
+end of the current logical (not visual) line after insertion."
+  :type '(radio (const :tag "Stay after input" after-input)
+                (const :tag "Move to end of line" end-of-line))
+  :group 'eat-ui)
+
+(defcustom eat-line-input-send-function #'eat-line-send-default
+  "Function to send the shell prompt input.
+
+The function is called without any argument.  The buffer is narrowed
+to the input.  The function may modify the input but mustn't modify
+the buffer restrictions.  It should call
+`eat-line-send-default' to send the final output."
+  :type 'function
+  :group 'eat-ui)
+
 (defcustom eat-semi-char-non-bound-keys
   '([?\C-x] [?\C-\\] [?\C-q] [?\C-g] [?\C-h] [?\e ?\C-c] [?\C-u]
     [?\e ?x] [?\e ?:] [?\e ?!] [?\e ?&]
@@ -325,35 +359,6 @@ arguments, otherwise it's ignored."
 (defcustom eat-enable-auto-line-mode nil
   "Non-nil means switch to line mode automatically on shell prompt."
   :type 'boolean
-  :group 'eat-ui)
-
-(defcustom eat-line-input-ring-size 1000
-  "Number of input history items to keep."
-  :type 'natnump
-  :group 'eat-ui)
-
-(defcustom eat-line-move-point-for-matching-input 'after-input
-  "Controls where to place point after matching input.
-
-\\<eat-line-mode-map>This influences the commands \
-\\[eat-line-previous-matching-input-from-input] and \
-\\[eat-line-next-matching-input-from-input].
-If `after-input', point will be positioned after the input typed
-by the user, but before the rest of the history entry that has
-been inserted.  If `end-of-line', point will be positioned at the
-end of the current logical (not visual) line after insertion."
-  :type '(radio (const :tag "Stay after input" after-input)
-                (const :tag "Move to end of line" end-of-line))
-  :group 'eat-ui)
-
-(defcustom eat-line-input-send-function #'eat-line-send-default
-  "Function to send the shell prompt input.
-
-The function is called without any argument.  The buffer is narrowed
-to the input.  The function may modify the input but mustn't modify
-the buffer restrictions.  It should call
-`eat-line-send-default' to send the final output."
-  :type 'function
   :group 'eat-ui)
 
 (defcustom eat-enable-shell-prompt-annotation t
@@ -5833,7 +5838,10 @@ MODE should one of:
 (define-minor-mode eat--line-mode
   "Minor mode for line mode."
   :interactive nil
-  :keymap eat-line-mode-map)
+  :keymap eat-line-mode-map
+  (if eat--line-mode
+      (add-hook 'pre-command-hook #'eat--line-move-to-input nil t)
+    (remove-hook 'pre-command-hook #'eat--line-move-to-input t)))
 
 (defun eat-line-mode ()
   "Switch to line mode."
@@ -5858,6 +5866,15 @@ MODE should one of:
     (setq buffer-undo-list nil)
     (setq eat--inhibit-auto-line-mode t)
     (setq eat--auto-line-mode-prev-mode nil)))
+
+(defun eat--line-move-to-input ()
+  "Move point to the input line."
+  (when (and eat-line-auto-move-to-input
+             (< (point) (eat-term-end eat--terminal))
+             (eq #'self-insert-command this-command))
+    (deactivate-mark)
+    (push-mark)
+    (goto-char (point-max))))
 
 (defun eat-line-send-default ()
   "Send shell prompt input directly to the terminal."

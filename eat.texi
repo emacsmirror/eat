@@ -397,6 +397,13 @@ input a newline character without actually sending it, you can press
 the terminal.  @kbd{C-d} deletes the character after the point, or
 sends EOF if the input is empty.
 
+@vindex eat-line-auto-move-to-input
+You can't modify the terminal in ``line mode'', you can write only in
+the input line.  Eat automatically moves the point to the input line
+if you try to insert character in the terminal region.  This behavior
+can be disabled by customizing @code{eat-line-auto-move-to-input} to
+@code{nil}.
+
 @kindex C-c C-e @r{(``line mode'')}
 @kindex C-c C-j @r{(``line mode'')}
 @kindex C-c M-d @r{(``line mode'')}
