@@ -62,6 +62,7 @@ Basic Operations
 * Keyboard::            Most keyboard keys are captured by Eat.
 * Mouse::               Eat supports mouse.
 * Input Modes::         Input modes for various use-cases.
+* Password Input::      Safely inputting credentials.
 
 Advanced Customizations
 * Shell Integration::   Getting the most from Eat and your shell.
@@ -447,6 +448,25 @@ other parts of the Eat buffer, they search in the Eat buffer.  If
 
 Input history is not loaded from the shell history file, to do that,
 @xref{Line Mode Integration}.
+
+@node Password Input
+@cindex password input
+@cindex credential input
+@cindex input, password
+@cindex input, credential
+@chapter Password Input
+
+By default, every keystroke gets recorded in the lossage, which can be
+seen by pressing @kbd{C-h l}.  This is actually a good thing, unless
+you're inputting password.
+
+@findex eat-send-command
+Emacs doesn't record keystrokes when a password is read from the
+minibuffer.  However, when the password prompt is in the terminal, the
+keys you use to type in your password gets recorded.  To prevent this
+from happening, you can use the command @command{eat-send-command},
+it'll read password from the minibuffer and send it.  Since the
+password is read from the minibuffer, it's not recorded.
 
 @part Part III:@* Advanced Customizations
 

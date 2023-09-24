@@ -5662,6 +5662,15 @@ EVENT is the mouse event."
       ;; Insert the text without putting it onto the kill ring.
       (eat-term-send-string-as-yank eat-terminal pasted-text))))
 
+(defun eat-send-password ()
+  "Read password from minibuffer and send it to the terminal."
+  (declare (interactive-only t))
+  (interactive)
+  (unless eat-terminal
+    (user-error "Process not running"))
+  (eat-term-send-string eat-terminal (read-passwd "Password: "))
+  (eat-self-input 1 'return))
+
 ;; When changing these keymaps, be sure to update the manual, README
 ;; and commentary.
 (defvar eat-mode-map
