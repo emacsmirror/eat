@@ -4366,6 +4366,10 @@ client process may get confused."
            (send "\e\C-?"))
           ('C-M-backspace
            (send "\e\C-h"))
+          ('tab
+           (send "\t"))
+          ('backtab
+           (send "\e[Z"))
           ;; Function keys.
           ((and (pred symbolp)
                 fn-key
@@ -4651,9 +4655,9 @@ EXCEPTIONS is a list of key sequences to not bind.  Don't use
          for i from ?\C-@ to ?\C-?
          do (unless (= i meta-prefix-char)
               (bind (vector i))))
-        ;; Bind `backspace', `delete', `deletechar', and all modified
-        ;; variants.
-        (dolist (key '( backspace C-backspace
+        ;; Bind `tab', `backspace', `delete', `deletechar', and all
+        ;; modified variants.
+        (dolist (key '( tab backtab backspace C-backspace
                         M-backspace C-M-backspace
                         insert C-insert M-insert S-insert C-M-insert
                         C-S-insert M-S-insert C-M-S-insert
