@@ -182,6 +182,22 @@ FUNCTION      Call FUNCTION with the command and arguments (using
                 (function :tag "Function"))
   :group 'eat-eshell)
 
+(defcustom eat-sixel-scale 1.0
+  "Scale Sixel images by this amount."
+  :type 'number
+  :group 'eat-ui
+  :group 'eat-eshell)
+
+(defcustom eat-sixel-aspect-ratio 1.0
+  "Aspect ratio of Sixel images.
+
+The value is a positive number specifying the ratio of the width and
+height of a Sixel pixel.  For example, the value of 1.5 means the
+aspect ratio of 3:2."
+  :type 'number
+  :group 'eat-ui
+  :group 'eat-eshell)
+
 (defcustom eat-sixel-render-formats '(svg half-block background none)
   "List of formats to render Sixel, in order of preference."
   :type '(repeat (choice (const :tag "SVG Image" svg)
@@ -1144,9 +1160,9 @@ Nil when not in alternative display mode.")
   (sixel-render-format
    'background
    :documentation "Format to render Sixel images in.")
-  (sixel-image-height
+  (sixel-image-extra-props
    nil
-   :documentation "Height of images used to display Sixel.")
+   :documentation "Extra properties of images used to display Sixel.")
   (sixel-scroll-mode t :documentation "Whether to auto-scroll.")
   (sixel-initial-cursor-pos
    '(1 . 1)
@@ -3075,9 +3091,8 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
                               (format " fill=\"%s\"></rect>" color))
                              strs))))
                       strs))
-                  :height ,(eat--t-term-sixel-image-height
-                            eat--t-term)
-                  :ascent center)))))
+                  ,@(eat--t-term-sixel-image-extra-props
+                     eat--t-term))))))
           (forward-char)
           (eat--t-fix-partial-multi-col-char 'preserve-face))))
     (dotimes (_ (cdr char-size))
@@ -4000,8 +4015,8 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
        (error "`sixel-render-format' parameter must be set to one of\
  the supported methods"))
      (setf (eat--t-term-sixel-render-format terminal) value))
-    ('sixel-image-height
-     (setf (eat--t-term-sixel-image-height terminal) value)))
+    ('sixel-image-extra-properties
+     (setf (eat--t-term-sixel-image-extra-props terminal) value)))
   ;; Set the parameter.
   (puthash parameter value (eat--t-term-params terminal)))
 
@@ -5074,6 +5089,35 @@ selection, or nil if none."
                          (image-type-available-p 'svg))
                 (cl-return 'svg)))))
     'none))
+
+(defun eat--set-term-sixel-params ()
+  "Set Sixel related parameters of the terminal."
+  (let* ((render-fmt (eat--sixel-render-format))
+         (dimensions
+          (pcase render-fmt
+            ((or 'background 'none) '(1 . 1))
+            ('half-block '(1 . 2))
+            (_ (cons (default-font-width) (default-font-height)))))
+         (scale-x (* eat-sixel-aspect-ratio eat-sixel-scale))
+         (scale-y eat-sixel-scale)
+         (font-size (font-get (font-spec :name (face-font 'default))
+                              :size)))
+    (setf (car dimensions) (round (/ (car dimensions)
+                                     (float scale-x))))
+    (setf (cdr dimensions) (round (/ (cdr dimensions)
+                                     (float scale-y))))
+    (setf (eat-term-parameter eat-terminal 'sixel-render-format)
+          render-fmt)
+    (setf (eat-term-parameter eat-terminal 'char-dimensions)
+          dimensions)
+    (unless (memq render-fmt '(none background half-block))
+      (setf
+       (eat-term-parameter eat-terminal 'sixel-image-extra-properties)
+       `( :ascent center
+          :height ,(cons (/ (float (default-font-height)) font-size)
+                         'em)
+          :width ,(cons (/ (float (default-font-width)) font-size)
+                        'em))))))
 
 (defun eat--set-cwd (_ host cwd)
   "Set CWD as the current working directory (`default-directory').
@@ -6920,17 +6964,7 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
       (setf (eat-term-set-cwd-function eat-terminal) #'eat--set-cwd)
       (setf (eat-term-parameter eat-terminal 'ui-command-function)
             #'eat--handle-uic)
-      (setf (eat-term-parameter eat-terminal 'sixel-render-format)
-            (eat--sixel-render-format))
-      (when (display-graphic-p)
-        (setf (eat-term-parameter eat-terminal 'sixel-image-height)
-              (cons (/ (float (default-font-height))
-                       (font-get
-                        (font-spec :name (face-font 'default))
-                        :size))
-                    'em)))
-      (setf (eat-term-parameter eat-terminal 'char-dimensions)
-            (cons (default-font-width) (default-font-height)))
+      (eat--set-term-sixel-params)
       ;; Crank up a new process.
       (let* ((size (eat-term-size eat-terminal))
              (process-environment
@@ -7282,7 +7316,7 @@ PROGRAM can be a shell command."
     (process-put proc 'adjust-window-size-function
                  #'eat--adjust-process-window-size)
     (setq eat-terminal (eat-term-make (current-buffer)
-                                       (process-mark proc)))
+                                      (process-mark proc)))
     (set-marker (process-mark proc) (eat-term-end eat-terminal))
     (setf (eat-term-input-function eat-terminal) #'eat--send-input)
     (setf (eat-term-set-cursor-function eat-terminal)
@@ -7295,17 +7329,7 @@ PROGRAM can be a shell command."
     (setf (eat-term-set-cwd-function eat-terminal) #'eat--set-cwd)
     (setf (eat-term-parameter eat-terminal 'ui-command-function)
           #'eat--eshell-handle-uic)
-    (setf (eat-term-parameter eat-terminal 'sixel-render-format)
-          (eat--sixel-render-format))
-    (when (display-graphic-p)
-      (setf (eat-term-parameter eat-terminal 'sixel-image-height)
-            (cons (/ (float (default-font-height))
-                     (font-get
-                      (font-spec :name (face-font 'default))
-                      :size))
-                  'em)))
-    (setf (eat-term-parameter eat-terminal 'char-dimensions)
-          (cons (default-font-width) (default-font-height)))
+    (eat--set-term-sixel-params)
     (setf (eat-term-parameter eat-terminal 'eat--process) proc)
     (unless (>= emacs-major-version 29)
       (setf (eat-term-parameter eat-terminal 'eat--input-process)

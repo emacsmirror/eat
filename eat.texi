@@ -967,6 +967,23 @@ Eat can show Sixel graphics.  Sixel is a bitmap graphics format that
 can be used to display graphics in a terminal, for example, images, or
 plotting graphs.
 
+You can control the display of Sixel images by customizing the
+following user options.
+
+@vindex eat-sixel-scale
+@defopt eat-sixel-scale
+This is a non-negative number that specifies the amount to scale the
+image by.
+@end defopt
+
+@vindex eat-sixel-aspect-ratio
+@defopt eat-sixel-aspect-ratio
+This is a non-negative number that specifies the aspect ratio, i.e.
+the ratio of width and height of a Sixel pixel.  For example, the
+value of 2 means the width of a Sixel pixel is the double of its
+height.
+@end defopt
+
 Eat converts Sixel graphics to an image format Emacs can natively
 display.  This preference of image formats can be configured by
 customizing the @code{eat-sixel-render-formats} user option.
