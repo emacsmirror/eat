@@ -730,6 +730,9 @@ contents on display unaltered."
   :type 'boolean
   :group 'eat-term)
 
+(make-obsolete-variable 'eat-enable-alternative-display
+                        "don't use it." "0.9" 'set)
+
 (defcustom eat-enable-mouse t
   "Non-nil means enable mouse support.
 
