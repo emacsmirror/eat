@@ -1198,6 +1198,17 @@ Nil when not in alternative display mode.")
    (copy-hash-table
     (eval-when-compile
       (let ((tbl (make-hash-table :test 'eq)))
+        (puthash 'input-function #'ignore tbl)
+        (puthash 'ring-bell-function #'ignore tbl)
+        (puthash 'set-cursor-function #'ignore tbl)
+        (puthash 'grab-mouse-function #'ignore tbl)
+        (puthash 'grab-focus-events-function #'ignore tbl)
+        (puthash 'manipulate-selection-function #'ignore tbl)
+        (puthash 'set-title-function #'ignore tbl)
+        (puthash 'set-cwd-function #'ignore tbl)
+        (puthash 'ui-command-function #'ignore tbl)
+        (puthash 'char-dimensions '(1 . 1) tbl)
+        (puthash 'sixel-render-format 'background tbl)
         (puthash 'bold-face 'eat-term-bold tbl)
         (puthash 'faint-face 'eat-term-faint tbl)
         (puthash 'italic-face 'eat-term-italic tbl)
@@ -3939,10 +3950,26 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
              :cursor (eat--t-make-cur
                       :position (copy-marker position)))))
 
+(defun eat-term-p (object)
+  "Return non-nil if OBJECT is a Eat terminal."
+  (eat--t-term-p object))
+
+(defun eat-term-live-p (object)
+  "Return non-nil if OBJECT is a live Eat terminal."
+  (and (eat-term-p object)
+       (not (not (eat--t-term-buffer object)))))
+
+(defmacro eat--t-ensure-live-term (object)
+  "Signal error if OBJECT is not a live Eat terminal."
+  `(unless (eat-term-live-p ,object)
+     (error "%s is not a live Eat terminal"
+            ,(upcase (symbol-name object)))))
+
 (defmacro eat--t-with-env (terminal &rest body)
   "Setup the environment for TERMINAL and eval BODY in it."
   (declare (indent 1))
   `(let ((eat--t-term ,terminal))
+     (eat--t-ensure-live-term ,terminal)
      (with-current-buffer (eat--t-term-buffer eat--t-term)
        (save-excursion
          (save-restriction
@@ -3963,6 +3990,7 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
 
 (defun eat-term-delete (terminal)
   "Delete TERMINAL and do any cleanup to do."
+  (eat--t-ensure-live-term terminal)
   (let ((inhibit-quit t)
         (eat--t-term terminal))
     (with-current-buffer (eat--t-term-buffer eat--t-term)
@@ -3978,7 +4006,8 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
           (unless (bobp)
             (backward-char))
           (while (not (eobp))
-            (eat--t-join-long-line)))))))
+            (eat--t-join-long-line)))))
+    (setf (eat--t-term-buffer eat--t-term) nil)))
 
 (defun eat-term-reset (terminal)
   "Reset TERMINAL."
@@ -3988,12 +4017,73 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
 
 (defun eat-term-parameter (terminal parameter)
   "Return the value of parameter PARAMETER of TERMINAL."
+  (eat--t-ensure-live-term terminal)
   (gethash parameter (eat--t-term-params terminal)))
+
+(defun eat-term-parameters (terminal)
+  "Return the parameter-alist of TERMINAL."
+  (eat--t-ensure-live-term terminal)
+  (let ((alist nil))
+    (maphash (lambda (key val) (push (cons key val) alist))
+             (eat--t-term-params terminal))))
 
 (defun eat-term-set-parameter (terminal parameter value)
   "Set the value of parameter PARAMETER of TERMINAL to VALUE."
+  (eat--t-ensure-live-term terminal)
   ;; Handle special parameters, and reject invalid values.
   (pcase parameter
+    ('input-function
+     (unless (functionp value)
+       (signal 'wrong-type-argument (list 'functionp value)))
+     (setf (eat--t-term-input-fn terminal) value))
+    ('ring-bell-function
+     (unless (functionp value)
+       (signal 'wrong-type-argument (list 'functionp value)))
+     (setf (eat--t-term-bell-fn terminal) value))
+    ('set-cursor-function
+     (unless (functionp value)
+       (signal 'wrong-type-argument (list 'functionp value)))
+     (setf (eat--t-term-set-cursor-fn terminal) value))
+    ('grab-mouse-function
+     (unless (functionp value)
+       (signal 'wrong-type-argument (list 'functionp value)))
+     (setf (eat--t-term-grab-mouse-fn terminal) value))
+    ('grab-focus-events-function
+     (unless (functionp value)
+       (signal 'wrong-type-argument (list 'functionp value)))
+     (setf (eat--t-term-set-focus-ev-mode-fn terminal) value))
+    ('manipulate-selection-function
+     (unless (functionp value)
+       (signal 'wrong-type-argument (list 'functionp value)))
+     (setf (eat--t-term-manipulate-selection-fn terminal) value))
+    ('set-title-function
+     (unless (functionp value)
+       (signal 'wrong-type-argument (list 'functionp value)))
+     (setf (eat--t-term-set-title-fn terminal) value))
+    ('set-cwd-function
+     (unless (functionp value)
+       (signal 'wrong-type-argument (list 'functionp value)))
+     (setf (eat--t-term-set-cwd-fn terminal) value))
+    ('ui-command-function
+     (unless (functionp value)
+       (signal 'wrong-type-argument (list 'functionp value)))
+     (setf (eat--t-term-ui-cmd-fn terminal) value))
+    ('char-dimensions
+     (unless (and (consp value)
+                  (integerp (car value))
+                  (> (car value) 0)
+                  (integerp (cdr value))
+                  (> (cdr value) 0))
+       (signal 'wrong-type-argument (list 'consp value)))
+     (setf (eat--t-term-char-width terminal) (car value))
+     (setf (eat--t-term-char-height terminal) (cdr value)))
+    ('sixel-render-format
+     (unless (memq value '(background half-block svg xpm none))
+       (error "`sixel-render-format' parameter must be set to one of \
+the supported formats"))
+     (setf (eat--t-term-sixel-render-format terminal) value))
+    ('sixel-image-extra-properties
+     (setf (eat--t-term-sixel-image-extra-props terminal) value))
     ('bold-face
      (unless (and (symbolp value) (facep value))
        (signal 'wrong-type-argument (list '(symbolp facep) value)))
@@ -4039,45 +4129,12 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
      (unless (and (symbolp value) (facep value))
        (signal 'wrong-type-argument (list '(symbolp facep) value)))
      (setf (aref (eat--t-term-font-faces terminal) index)
-           value))
-    ('ui-command-function
-     (unless (functionp value)
-       (signal 'wrong-type-argument (list 'functionp value)))
-     (setf (eat--t-term-ui-cmd-fn terminal) value))
-    ('char-dimensions
-     (unless (and (consp value)
-                  (integerp (car value))
-                  (> (car value) 0)
-                  (integerp (cdr value))
-                  (> (cdr value) 0))
-       (signal 'wrong-type-argument (list 'consp value)))
-     (setf (eat--t-term-char-width terminal) (car value))
-     (setf (eat--t-term-char-height terminal) (cdr value)))
-    ('sixel-render-format
-     (unless (memq value '(background half-block svg xpm none))
-       (error "`sixel-render-format' parameter must be set to one of\
- the supported formats"))
-     (setf (eat--t-term-sixel-render-format terminal) value))
-    ('sixel-image-extra-properties
-     (setf (eat--t-term-sixel-image-extra-props terminal) value)))
+           value)))
   ;; Set the parameter.
   (puthash parameter value (eat--t-term-params terminal)))
 
 (gv-define-setter eat-term-parameter (value terminal parameter)
   `(eat-term-set-parameter ,terminal ,parameter ,value))
-
-(defun eat-term-input-function (terminal)
-  "Return the function used to send input from TERMINAL.
-
-The function is called with two arguments, TERMINAL and the string to
-send.  The function should not change point and buffer restriction.
-
-To set it, use (`setf' (`eat-term-input-function' TERMINAL) FUNCTION),
-where FUNCTION is the input function."
-  (eat--t-term-input-fn terminal))
-
-(gv-define-setter eat-term-input-function (function terminal)
-  `(setf (eat--t-term-input-fn ,terminal) ,function))
 
 (defun eat-term-cursor-type (terminal)
   "Return the cursor state of TERMINAL.
@@ -4091,163 +4148,17 @@ The return value can be one of the following:
   `:blinking-bar'       Blinking vertical bar cursor.
   `:underline'          Horizontal bar cursor.
   `:blinking-underline' Blinking horizontal bar cursor."
+  (eat--t-ensure-live-term terminal)
   (if (eat--t-term-cur-visible-p terminal)
       (eat--t-term-cur-state terminal)
     :invisible))
-
-(defun eat-term-set-cursor-function (terminal)
-  "Return the function used to set the cursor of TERMINAL.
-
-The function is called with two arguments, TERMINAL and a symbol STATE
-describing the new state of cursor.  The function should not change
-point and buffer restriction.  STATE can be one of the following:
-
-  `:invisible'          Invisible cursor.
-  `:block'              Block (filled box) cursor (default).
-  `:blinking-block'     Blinking block cursor.
-  `:bar'                Vertical bar cursor.
-  `:blinking-bar'       Blinking vertical bar cursor.
-  `:underline'          Horizontal bar cursor.
-  `:blinking-underline' Blinking horizontal bar cursor.
-
-More possible values might be added in future.  So in case the
-function doesn't know about a particular cursor state, it should reset
-the cursor to the default like the `:block' state.
-
-To set it, use (`setf' (`eat-term-set-cursor-function' TERMINAL)
-FUNCTION), where FUNCTION is the function to set cursor."
-  (eat--t-term-set-cursor-fn terminal))
-
-(gv-define-setter eat-term-set-cursor-function (function terminal)
-  `(setf (eat--t-term-set-cursor-fn ,terminal) ,function))
-
-(defun eat-term-grab-mouse-function (terminal)
-  "Return the function used to grab the mouse.
-
-The function is called with two arguments, TERMINAL and a symbol MODE
-describing the new mouse mode MODE.  The function should not change
-point and buffer restriction.  MODE can be one of the following:
-
-  nil                 Disable mouse.
-  `:click'              Pass `mouse-1', `mouse-2', and `mouse-3'
-                        clicks.
-  `:modifier-click'     Pass all mouse click events on both press and
-                        release, including `control', `meta' and
-                        `shift' modifiers.
-  `:drag'               All of `:modifier-click', plus dragging
-                        (moving mouse while pressed) information.
-  `:all'                Pass all mouse events, including movement.
-
-More possible values might be added in future.  So in case the
-function doesn't know about a particular mouse mode, it should behave
-as if MODE was nil and disable mouse.
-
-To set it, use (`setf' (`eat-term-set-mouse-mode-function' TERMINAL)
-FUNCTION), where FUNCTION is the function to set mouse mode."
-  (eat--t-term-grab-mouse-fn terminal))
-
-(gv-define-setter eat-term-grab-mouse-function (function terminal)
-  `(setf (eat--t-term-grab-mouse-fn ,terminal) ,function))
-
-(defun eat-term-grab-focus-events-function (terminal)
-  "Return the function used to grab focus in and out events.
-
-The function is called with two arguments, TERMINAL and a boolean
-describing the new grabbing mode.  When the boolean is nil, don't send
-focus event, otherwise send focus events.  The function should not
-change point and buffer restriction.
-
-To set it, use (`setf' (`eat-term-grab-focus-events-function'
-TERMINAL) FUNCTION), where FUNCTION is the function to grab focus
-events."
-  (eat--t-term-set-focus-ev-mode-fn terminal))
-
-(gv-define-setter eat-term-grab-focus-events-function
-    (function terminal)
-  `(setf (eat--t-term-set-focus-ev-mode-fn ,terminal) ,function))
-
-(defun eat-term-manipulate-selection-function (terminal)
-  "Return the function used to manipulate selection (or `kill-ring').
-
-The function is called with three arguments, TERMINAL, a symbol
-SELECTION describing the selection paramater and DATA, a string, or a
-boolean.  The function should not change point and buffer restriction.
-SELECTION can be one of `:clipboard', `:primary', `:secondary',
-`:select'.  When DATA is a string, it should set the selection to that
-string, when DATA is nil, it should unset the selection, and when DATA
-is t, it should return the selection, or nil if none.
-
-To set it, use (`setf' (`eat-term-manipulate-selection-function'
-TERMINAL) FUNCTION), where FUNCTION is the function to manipulate
-selection."
-  (eat--t-term-manipulate-selection-fn terminal))
-
-(gv-define-setter eat-term-manipulate-selection-function
-    (function terminal)
-  `(setf (eat--t-term-manipulate-selection-fn ,terminal) ,function))
-
-(defun eat-term-ring-bell-function (terminal)
-  "Return the function used to ring the bell.
-
-The function is called with a single argument TERMINAL.  The function
-should not change point and buffer restriction.
-
-To set it, use (`setf' (`eat-term-ring-bell-function' TERMINAL)
-FUNCTION), where FUNCTION is the function to ring the bell."
-  (eat--t-term-bell-fn terminal))
-
-(gv-define-setter eat-term-ring-bell-function (function terminal)
-  `(setf (eat--t-term-bell-fn ,terminal) ,function))
-
-(defun eat-term-title (terminal)
-  "Return the current title of TERMINAL."
-  (eat--t-term-title terminal))
-
-(defun eat-term-set-title-function (terminal)
-  "Return the function used to set the title of TERMINAL.
-
-The function is called with two arguments, TERMINAL and the new title
-of TERMINAL.  The function should not change point and buffer
-restriction.
-
-Note that the client is responsible for the arguments to the function,
-verify them before using.
-
-To set it, use (`setf' (`eat-term-set-title-function' TERMINAL)
-FUNCTION), where FUNCTION is the function to set title."
-  (eat--t-term-set-title-fn terminal))
-
-(gv-define-setter eat-term-set-title-function (function terminal)
-  `(setf (eat--t-term-set-title-fn ,terminal) ,function))
-
-(defun eat-term-set-cwd-function (terminal)
-  "Return the function used to set the working directory of TERMINAL.
-
-The function is called with three arguments, TERMINAL, the host where
-the directory is, and the new (current) working directory of TERMINAL.
-The function should not change point and buffer restriction.
-
-Note that the client is responsible for the arguments to the function,
-verify them before using.
-
-To set it, use (`setf' (`eat-term-set-cwd-function' TERMINAL)
-FUNCTION), where FUNCTION is the function to set the current working
-directory."
-  (eat--t-term-set-cwd-fn terminal))
-
-(gv-define-setter eat-term-set-cwd-function (function terminal)
-  `(setf (eat--t-term-set-cwd-fn ,terminal) ,function))
-
-(defun eat-term-size (terminal)
-  "Return the size of TERMINAL as (WIDTH . HEIGHT)."
-  (let ((disp (eat--t-term-display terminal)))
-    (cons (eat--t-disp-width disp) (eat--t-disp-height disp))))
 
 (defun eat-term-beginning (terminal)
   "Return the beginning position of TERMINAL.
 
 Don't use markers to store the position, call this function whenever
 you need the position."
+  (eat--t-ensure-live-term terminal)
   (eat--t-term-begin terminal))
 
 (defun eat-term-end (terminal)
@@ -4257,14 +4168,17 @@ This is also the end position of TERMINAL's display.
 
 Don't use markers to store the position, call this function whenever
 you need the position."
+  (eat--t-ensure-live-term terminal)
   (eat--t-term-end terminal))
 
 (defun eat-term-display-beginning (terminal)
   "Return the beginning position of TERMINAL's display."
+  (eat--t-ensure-live-term terminal)
   (eat--t-disp-begin (eat--t-term-display terminal)))
 
 (defun eat-term-display-cursor (terminal)
   "Return the cursor's current position on TERMINAL's display."
+  (eat--t-ensure-live-term terminal)
   (let* ((disp (eat--t-term-display terminal))
          (cursor (eat--t-disp-cursor disp)))
     ;; The cursor might be after the edge of the display.  But we
@@ -4272,6 +4186,17 @@ you need the position."
     (if (> (eat--t-cur-x cursor) (eat--t-disp-width disp))
         (1- (eat--t-cur-position cursor))
       (eat--t-cur-position cursor))))
+
+(defun eat-term-title (terminal)
+  "Return the current title of TERMINAL."
+  (eat--t-ensure-live-term terminal)
+  (eat--t-term-title terminal))
+
+(defun eat-term-size (terminal)
+  "Return the size of TERMINAL as (WIDTH . HEIGHT)."
+  (eat--t-ensure-live-term terminal)
+  (let ((disp (eat--t-term-display terminal)))
+    (cons (eat--t-disp-width disp) (eat--t-disp-height disp))))
 
 (defun eat-term-process-output (terminal output)
   "Process OUTPUT from client and show it on TERMINAL's display."
@@ -4309,6 +4234,7 @@ you need the position."
 
 (defun eat-term-in-alternative-display-p (terminal)
   "Return non-nil when TERMINAL is in alternative display mode."
+  (eat--t-ensure-live-term terminal)
   (eat--t-term-main-display terminal))
 
 (defun eat-term-input-event (terminal n event &optional ref-pos)
@@ -4331,6 +4257,7 @@ given.
 For mouse events, events should be sent on both mouse button press and
 release unless the mouse grabing mode is `:click', otherwise the
 client process may get confused."
+  (eat--t-ensure-live-term terminal)
   (let ((disp (eat--t-term-display terminal)))
     (cl-flet ((send (str)
                 (funcall (eat--t-term-input-fn terminal)
@@ -4663,12 +4590,14 @@ client process may get confused."
 
 (defun eat-term-send-string (terminal string)
   "Send STRING to TERMINAL directly."
+  (eat--t-ensure-live-term terminal)
   (funcall (eat--t-term-input-fn terminal) terminal string))
 
 (defun eat-term-send-string-as-yank (terminal args)
   "Send ARGS to TERMINAL, honoring bracketed yank mode.
 
 Each argument in ARGS can be either string or character."
+  (eat--t-ensure-live-term terminal)
   (funcall (eat--t-term-input-fn terminal) terminal
            (let ((str (mapconcat (lambda (s)
                                    (if (stringp s) s (string s)))
@@ -6999,15 +6928,19 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
         (with-selected-window window
           (eat-term-resize eat-terminal (window-max-chars-per-line)
                            (floor (window-screen-lines)))))
-      (setf (eat-term-input-function eat-terminal) #'eat--send-input)
-      (setf (eat-term-set-cursor-function eat-terminal)
+      (setf (eat-term-parameter eat-terminal 'input-function)
+            #'eat--send-input)
+      (setf (eat-term-parameter eat-terminal 'set-cursor-function)
             #'eat--set-cursor)
-      (setf (eat-term-grab-mouse-function eat-terminal)
+      (setf (eat-term-parameter eat-terminal 'grab-mouse-function)
             #'eat--grab-mouse)
-      (setf (eat-term-manipulate-selection-function eat-terminal)
+      (setf (eat-term-parameter
+             eat-terminal 'manipulate-selection-function)
             #'eat--manipulate-kill-ring)
-      (setf (eat-term-ring-bell-function eat-terminal) #'eat--bell)
-      (setf (eat-term-set-cwd-function eat-terminal) #'eat--set-cwd)
+      (setf (eat-term-parameter eat-terminal 'ring-bell-function)
+            #'eat--bell)
+      (setf (eat-term-parameter eat-terminal 'set-cwd-function)
+            #'eat--set-cwd)
       (setf (eat-term-parameter eat-terminal 'ui-command-function)
             #'eat--handle-uic)
       (eat--set-term-sixel-params)
@@ -7364,15 +7297,19 @@ PROGRAM can be a shell command."
     (setq eat-terminal (eat-term-make (current-buffer)
                                       (process-mark proc)))
     (set-marker (process-mark proc) (eat-term-end eat-terminal))
-    (setf (eat-term-input-function eat-terminal) #'eat--send-input)
-    (setf (eat-term-set-cursor-function eat-terminal)
+    (setf (eat-term-parameter eat-terminal 'input-function)
+          #'eat--send-input)
+    (setf (eat-term-parameter eat-terminal 'set-cursor-function)
           #'eat--set-cursor)
-    (setf (eat-term-grab-mouse-function eat-terminal)
+    (setf (eat-term-parameter eat-terminal 'grab-mouse-function)
           #'eat--grab-mouse)
-    (setf (eat-term-manipulate-selection-function eat-terminal)
+    (setf (eat-term-parameter
+           eat-terminal 'manipulate-selection-function)
           #'eat--manipulate-kill-ring)
-    (setf (eat-term-ring-bell-function eat-terminal) #'eat--bell)
-    (setf (eat-term-set-cwd-function eat-terminal) #'eat--set-cwd)
+    (setf (eat-term-parameter eat-terminal 'ring-bell-function)
+          #'eat--bell)
+    (setf (eat-term-parameter eat-terminal 'set-cwd-function)
+          #'eat--set-cwd)
     (setf (eat-term-parameter eat-terminal 'ui-command-function)
           #'eat--eshell-handle-uic)
     (eat--set-term-sixel-params)
@@ -7380,8 +7317,7 @@ PROGRAM can be a shell command."
     (unless (>= emacs-major-version 29)
       (setf (eat-term-parameter eat-terminal 'eat--input-process)
             proc))
-    (setf (eat-term-parameter eat-terminal 'eat--output-process)
-          proc)
+    (setf (eat-term-parameter eat-terminal 'eat--output-process) proc)
     (when-let* ((window (get-buffer-window nil t)))
       (with-selected-window window
         (eat-term-resize eat-terminal (window-max-chars-per-line)
@@ -8182,9 +8118,10 @@ FN is the original definition of `eat--eshell-cleanup', which see."
        (dolist (var eat--trace-recorded-variables)
          (set (make-local-variable var) (alist-get var variables)))
        (setq eat-terminal (eat-term-make (current-buffer) (point)))
-       (setf (eat-term-set-cursor-function eat-terminal)
+       (setf (eat-term-parameter eat-terminal 'set-cursor-function)
              #'eat--set-cursor)
-       (setf (eat-term-ring-bell-function eat-terminal) #'eat--bell)
+       (setf (eat-term-parameter eat-terminal 'ring-bell-function)
+             #'eat--bell)
        (eat-term-resize eat-terminal width height)
        (eat-term-redisplay eat-terminal))
       (`(,_time output ,string)
