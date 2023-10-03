@@ -991,11 +991,12 @@ customizing the @code{eat-sixel-render-formats} user option.
 @vindex eat-sixel-render-formats
 @defopt eat-sixel-render-formats
 List of formats to render Sixel, in order of preference.  Each element
-of the list is one of @code{svg}, @code{half-block},
-@code{background}, @code{none}.  @code{svg} means to use SVG image
-format, @code{half-block} means to use UTF-8 half block characters,
-@code{background} means to just use background color, and @code{none}
-means to not render the image, instead just clear the area.
+of the list is one of @code{xpm}, @code{svg}, @code{half-block},
+@code{background}, @code{none}.  @code{xpm} and @code{svg} means to
+use XPM and SVG image format respectively, @code{half-block} means to
+use UTF-8 half block characters, @code{background} means to just use
+background color, and @code{none} means to not render the image,
+instead just clear the area.
 @end defopt
 
 @node Blinking Text

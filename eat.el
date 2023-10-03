@@ -198,9 +198,11 @@ aspect ratio of 3:2."
   :group 'eat-ui
   :group 'eat-eshell)
 
-(defcustom eat-sixel-render-formats '(svg half-block background none)
+(defcustom eat-sixel-render-formats
+  '(xpm svg half-block background none)
   "List of formats to render Sixel, in order of preference."
-  :type '(repeat (choice (const :tag "SVG Image" svg)
+  :type '(repeat (choice (const :tag "XPM Image" xpm)
+                         (const :tag "SVG Image" svg)
                          (const :tag "UTF-8 half block" half-block)
                          (const :tag "Background color" background)
                          (const :tag "None" none)))
@@ -3043,6 +3045,42 @@ CHAR-SIZE is the width and height of a character."
                             (format " fill=\"%s\"></rect>" color))
                            strs))))
                     strs))
+          ,@(eat--t-term-sixel-image-extra-props eat--t-term))))
+      ('xpm
+       (put-text-property
+        (point) (1+ (point)) 'display
+        `(image
+          :type xpm
+          :data ,(let ((color-map nil)
+                       (pixmap nil)
+                       (color-key-length
+                        (length (format "%x" (* (car char-size)
+                                                (cdr char-size))))))
+                   (dotimes (i (cdr char-size))
+                     (push nil pixmap)
+                     (dotimes (j (car char-size))
+                       (let ((idx (format
+                                   (format "%%0%ix" color-key-length)
+                                   (+ (* i (car char-size)) j)))
+                             (color (or (aref (aref bitmap i) j)
+                                        "None")))
+                         (push (format "%s c %s" idx color) color-map)
+                         (push idx (car pixmap)))))
+                   (concat
+                    "/* XPM */\n"
+                    "static char * XFACE[] = {\n"
+                    (format "\"%i %i %i %i\",\n" (car char-size)
+                            (cdr char-size) (* (car char-size)
+                                               (cdr char-size))
+                            color-key-length)
+                    (mapconcat (lambda (line)
+                                 (format "\"%s\",\n" line))
+                               color-map)
+                    (mapconcat (lambda (row)
+                                 (format "\"%s\"" (string-join
+                                                   (nreverse row))))
+                               (nreverse pixmap) ",\n")
+                    "\n};"))
           ,@(eat--t-term-sixel-image-extra-props eat--t-term)))))))
 
 (defun eat--t-sixel-flush-line (nullify)
@@ -4016,9 +4054,9 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
      (setf (eat--t-term-char-width terminal) (car value))
      (setf (eat--t-term-char-height terminal) (cdr value)))
     ('sixel-render-format
-     (unless (memq value '(background half-block svg none))
+     (unless (memq value '(background half-block svg xpm none))
        (error "`sixel-render-format' parameter must be set to one of\
- the supported methods"))
+ the supported formats"))
      (setf (eat--t-term-sixel-render-format terminal) value))
     ('sixel-image-extra-properties
      (setf (eat--t-term-sixel-image-extra-props terminal) value)))
@@ -5092,7 +5130,10 @@ selection, or nil if none."
                        (cl-return 'half-block)))
         ('svg (when (and (display-graphic-p)
                          (image-type-available-p 'svg))
-                (cl-return 'svg)))))
+                (cl-return 'svg)))
+        ('xpm (when (and (display-graphic-p)
+                         (image-type-available-p 'xpm))
+                (cl-return 'xpm)))))
     'none))
 
 (defun eat--set-term-sixel-params ()
