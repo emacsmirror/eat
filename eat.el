@@ -2999,6 +2999,52 @@ is the selection data encoded in base64."
     (when (= (eat--t-cur-sixel-x cursor) 1000)
       (setf (eat--t-cur-sixel-x cursor) 999))))
 
+(defun eat--t-sixel-render-bitmap (bitmap)
+  "Render BITMAP.
+
+CHAR-SIZE is the width and height of a character."
+  (let ((char-size (cons (length (aref bitmap 0)) (length bitmap))))
+    (pcase-exhaustive (eat--t-term-sixel-render-format eat--t-term)
+      ('none)
+      ('background
+       (when-let* ((color (aref (aref bitmap 0) 0)))
+         (put-text-property (point) (1+ (point)) 'face
+                            `(:background ,color))))
+      ('half-block
+       (let ((fg (aref (aref bitmap (/ (cdr char-size) 2)) 0))
+             (bg (aref (aref bitmap 0) 0)))
+         (when (or fg bg)
+           (put-text-property
+            (point) (1+ (point)) 'display
+            (propertize
+             "▄" 'face
+             `(,@(and bg `(:background ,bg))
+               :foreground ,(or fg (face-background 'default))))))))
+      ('svg
+       (put-text-property
+        (point) (1+ (point)) 'display
+        `(image
+          :type svg
+          :data ,(apply
+                  #'concat
+                  (format "<svg width=\"%i\" height=\"%i\""
+                          (car char-size) (cdr char-size))
+                  " version=\"1.1\""
+                  " xmlns=\"http://www.w3.org/2000/svg\""
+                  " xmlns:xlink=\"http://www.w3.org/1999/xlink\">"
+                  (let ((strs '("</svg>")))
+                    (dotimes (i (cdr char-size))
+                      (dotimes (j (car char-size))
+                        (when-let* ((color (aref (aref bitmap i) j)))
+                          (push
+                           (concat
+                            "<rect width=\"1\" height=\"1\""
+                            (format " x=\"%i\" y=\"%i\"" j i)
+                            (format " fill=\"%s\"></rect>" color))
+                           strs))))
+                    strs))
+          ,@(eat--t-term-sixel-image-extra-props eat--t-term)))))))
+
 (defun eat--t-sixel-flush-line (nullify)
   "Flush current (not Sixel) line to the display.
 
@@ -3051,51 +3097,7 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
                   (setf (aref (aref bitmap k) i) color)))
               (cl-incf i)
               (cl-incf j))
-            (pcase-exhaustive
-                (eat--t-term-sixel-render-format eat--t-term)
-              ('none)
-              ('background
-               (when-let* ((color (aref (aref bitmap 0) 0)))
-                 (put-text-property (point) (1+ (point)) 'face
-                                    `(:background ,color))))
-              ('half-block
-               (let ((fg (aref (aref bitmap (/ (cdr char-size) 2)) 0))
-                     (bg (aref (aref bitmap 0) 0)))
-                 (when (or fg bg)
-                   (put-text-property
-                    (point) (1+ (point)) 'display
-                    (propertize
-                     "▄" 'face
-                     `(,@(and bg `(:background ,bg))
-                       :foreground ,(or fg (face-background
-                                            'default))))))))
-              ('svg
-               (put-text-property
-                (point) (1+ (point)) 'display
-                `(image
-                  :type svg
-                  :data
-                  ,(apply
-                    #'concat
-                    (format "<svg width=\"%i\" height=\"%i\""
-                            (car char-size) (cdr char-size))
-                    " version=\"1.1\""
-                    " xmlns=\"http://www.w3.org/2000/svg\""
-                    " xmlns:xlink=\"http://www.w3.org/1999/xlink\">"
-                    (let ((strs '("</svg>")))
-                      (dotimes (i (cdr char-size))
-                        (dotimes (j (car char-size))
-                          (when-let*
-                              ((color (aref (aref bitmap i) j)))
-                            (push
-                             (concat
-                              "<rect width=\"1\" height=\"1\""
-                              (format " x=\"%i\" y=\"%i\"" j i)
-                              (format " fill=\"%s\"></rect>" color))
-                             strs))))
-                      strs))
-                  ,@(eat--t-term-sixel-image-extra-props
-                     eat--t-term))))))
+            (eat--t-sixel-render-bitmap bitmap))
           (forward-char)
           (eat--t-fix-partial-multi-col-char 'preserve-face))))
     (dotimes (_ (cdr char-size))
