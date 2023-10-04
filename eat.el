@@ -6005,9 +6005,6 @@ character."
 (defvar eat--line-matching-input-from-input-string ""
   "Input previously used to match input history.")
 
-(defvar eat--line-history-isearch-message-overlay nil
-  "Overlay to show Isearch prompt, replacing the shell prompt.")
-
 (defvar eat--saved-line-input-history-isearch 'not-saved
   "Saved value of `eat-line-input-history-isearch'.")
 
@@ -6293,8 +6290,6 @@ If N is negative, search backwards for the -Nth previous match."
     (setq isearch-message-prefix-add "history ")
     (setq isearch-search-fun-function
           #'eat--line-history-isearch-search)
-    (setq isearch-message-function
-          #'eat--line-history-isearch-message)
     (setq isearch-wrap-function #'eat--line-history-isearch-wrap)
     (setq isearch-push-state-function
           #'eat--line-history-isearch-push-state)
@@ -6305,11 +6300,8 @@ If N is negative, search backwards for the -Nth previous match."
 
 (defun eat--line-history-isearch-end ()
   "Clean up after terminating Isearch."
-  (when eat--line-history-isearch-message-overlay
-    (delete-overlay eat--line-history-isearch-message-overlay))
   (setq isearch-message-prefix-add nil)
   (setq isearch-search-fun-function 'isearch-search-fun-default)
-  (setq isearch-message-function nil)
   (setq isearch-wrap-function nil)
   (setq isearch-push-state-function nil)
   ;; Force isearch to not change mark.
@@ -6400,49 +6392,6 @@ If N is negative, search backwards for the -Nth previous match."
                (point))
            ;; Return nil on the error "no next/preceding item"
            (error nil)))))))
-
-(defun eat--line-history-isearch-message (&optional c-q-hack ellipsis)
-  "Display the input history search prompt.
-
-If there are no search errors, this function displays an overlay with
-the Isearch prompt which replaces the original shell prompt.
-Otherwise, it displays the standard Isearch message returned from
-the function `isearch-message'.
-
-C-Q-HACK and ELLIPSIS are same as in function `isearch-message', which
-see."
-  (if (not (and isearch-success (not isearch-error)))
-      ;; Use standard function `isearch-message' when not in input
-      ;; line, or search fails, or has an error (like incomplete
-      ;; regexp).  This function displays isearch message in the echo
-      ;; area, so it's possible to see what is wrong in the search
-      ;; string.
-      (isearch-message c-q-hack ellipsis)
-    ;; Otherwise, put the overlay with the standard Isearch prompt
-    ;; over the shell prompt.
-    (if (overlayp eat--line-history-isearch-message-overlay)
-        (move-overlay eat--line-history-isearch-message-overlay
-                      (save-excursion
-                        (goto-char (eat-term-end eat-terminal))
-                        (forward-line 0)
-                        (point))
-                      (eat-term-end eat-terminal))
-      (setq eat--line-history-isearch-message-overlay
-            (make-overlay (save-excursion
-                            (goto-char (eat-term-end eat-terminal))
-                            (forward-line 0)
-                            (point))
-                          (eat-term-end eat-terminal)))
-      (overlay-put eat--line-history-isearch-message-overlay
-                   'evaporate t))
-    (overlay-put eat--line-history-isearch-message-overlay
-                 'display (isearch-message-prefix
-                           ellipsis isearch-nonincremental))
-    (if (and eat--line-input-ring-index (not ellipsis))
-        ;; Display the current history index.
-        (message "History item: %d" (1+ eat--line-input-ring-index))
-      ;; Or clear a previous isearch message.
-      (message ""))))
 
 (defun eat--line-history-isearch-wrap ()
   "Wrap the input history search when search fails.
@@ -6563,9 +6512,7 @@ END if it's safe to do so."
           eat--line-input-ring-index
           eat--line-stored-incomplete-input
           eat--line-matching-input-from-input-string
-          eat--line-history-isearch-message-overlay
           isearch-search-fun-function
-          isearch-message-function
           isearch-wrap-function
           isearch-push-state-function
           eat--pending-input-chunks
