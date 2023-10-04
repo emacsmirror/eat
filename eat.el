@@ -3207,10 +3207,9 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
               (eat--t-term-sixel-buffer eat--t-term)))
     (while (>= (eat--t-cur-sixel-y cursor) -5)
       (eat--t-sixel-flush-line nil)
-      (when (>= (eat--t-cur-sixel-y cursor) -5)
-        (if (eat--t-term-sixel-scroll-mode eat--t-term)
-            (eat--t-index)
-          (eat--t-cur-down)))))
+      (if (eat--t-term-sixel-scroll-mode eat--t-term)
+          (eat--t-index)
+        (eat--t-cur-down))))
   (unless (eat--t-term-sixel-scroll-mode eat--t-term)
     (eat--t-goto
      (car (eat--t-term-sixel-initial-cursor-pos eat--t-term))
