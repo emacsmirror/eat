@@ -6612,6 +6612,8 @@ mouse-3: Switch to char mode"
   ;; Make sure glyphless character don't display a huge box glyph,
   ;; that would break the display.
   (eat--setup-glyphless-chars)
+  ;; Setup completion for line mode.
+  (shell-completion-vars)
   (when eat-enable-blinking-text
     (eat-blink-mode +1))
   (when eat-enable-shell-prompt-annotation
