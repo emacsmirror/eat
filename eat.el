@@ -5,7 +5,7 @@
 ;; Author: Akib Azmain Turja <akib@disroot.org>
 ;; Created: 2022-08-15
 ;; Version: 0.8
-;; Package-Requires: ((emacs "27.1") (compat "29.1"))
+;; Package-Requires: ((emacs "29.1") (compat "29.1"))
 ;; Keywords: terminals processes
 ;; Homepage: https://codeberg.org/akib/emacs-eat
 
@@ -3694,7 +3694,7 @@ If NULLIFY is non-nil, nullify flushed part of Sixel buffer."
                       ;; OSC 5 2 ; <t> ; <s> ST.
                       ((rx string-start "52;"
                            (let targets
-                             (zero-or-more (not ?\;)))
+                             (zero-or-more (not (any ?\;))))
                            ?\; (let data (zero-or-more anything))
                            string-end)
                        (eat--t-manipulate-selection
@@ -5362,7 +5362,7 @@ BUFFER is the terminal buffer."
     ;; more parameters.
     ;; UIC e ; A ; <t> ; <s> ST.
     ((rx string-start "e;A;"
-         (let host (zero-or-more (not ?\;)))
+         (let host (zero-or-more (not (any ?\;))))
          ?\; (let path (zero-or-more anything))
          string-end)
      (eat--set-cwd-uic host path))
@@ -5395,14 +5395,14 @@ BUFFER is the terminal buffer."
      (eat--set-cmd-status (string-to-number status)))
     ;; UIC e ; I ; 0 ; <t> ; <t> ; <t> ST.
     ((rx string-start "e;I;0;"
-         (let format (zero-or-more (not ?\;)))
-         ?\; (let host (zero-or-more (not ?\;)))
+         (let format (zero-or-more (not (any ?\;))))
+         ?\; (let host (zero-or-more (not (any ?\;))))
          ?\; (let path (zero-or-more anything))
          string-end)
      (eat--get-shell-history (cons host path) format))
     ;; UIC e ; I ; 1 ; <t> ; <t> ST.
     ((rx string-start "e;I;1;"
-         (let format (zero-or-more (not ?\;)))
+         (let format (zero-or-more (not (any ?\;))))
          ?\; (let hist (zero-or-more anything))
          string-end)
      (eat--get-shell-history hist format))
@@ -7209,7 +7209,7 @@ PROGRAM can be a shell command."
   (pcase cmd
     ;; UIC e ; A ; <t> ; <s> ST.
     ((rx string-start "e;A;"
-         (let host (zero-or-more (not ?\;)))
+         (let host (zero-or-more (not (any ?\;))))
          ?\; (let path (zero-or-more anything))
          string-end)
      (eat--set-cwd-uic host path))
@@ -7335,12 +7335,15 @@ PROGRAM can be a shell command."
       (setq eat--output-queue-first-chunk-time nil)
       (let ((queue eat--pending-output-chunks))
         (setq eat--pending-output-chunks nil)
-        (combine-change-calls
-            (eat-term-beginning eat-terminal)
-            (eat-term-end eat-terminal)
-          ;; TODO: Is `string-join' OK or should we use a loop?
-          (eshell-output-filter
-           process (string-join (nreverse queue))))))))
+        (if (< emacs-major-version 27)
+            (eshell-output-filter
+             process (string-join (nreverse queue)))
+          (combine-change-calls
+           (eat-term-beginning eat-terminal)
+           (eat-term-end eat-terminal)
+           ;; TODO: Is `string-join' OK or should we use a loop?
+           (eshell-output-filter
+            process (string-join (nreverse queue)))))))))
 
 (defun eat--eshell-filter (process string)
   "Process output STRING from PROCESS."
@@ -7499,6 +7502,8 @@ symbol `buffer', in which case the point of current buffer is set."
   "Update the current working directory."
   (setq eat--eshell-invocation-directory default-directory))
 
+(defvar eshell-variable-aliases-list) ; In `esh-var'.
+
 (define-minor-mode eat--eshell-local-mode
   "Toggle Eat terminal emulation is Eshell."
   :interactive nil
@@ -7553,7 +7558,6 @@ symbol `buffer', in which case the point of current buffer is set."
 
 (declare-function eshell-gather-process-output "esh-proc"
                   (command args))
-(defvar eshell-variable-aliases-list) ; In `esh-var'.
 (defvar eshell-last-async-proc) ; In `esh-cmd'.
 (defvar eshell-last-async-procs) ; In `esh-cmd'.
 
