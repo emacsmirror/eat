@@ -2961,7 +2961,7 @@ is the selection data encoded in base64."
   ;; default.
   (setf (eat--t-term-sixel-color eat--t-term) 3)
   (while (< (eat--t-term-sixel-buffer-size eat--t-term)
-            (+ (eat--t-term-char-height eat--t-term) 5))
+            (+ (* (eat--t-term-char-height eat--t-term) 2) 5))
     (let ((new
            (cons (cons 0 (make-vector 1000 nil))
                  (cons (cadr (eat--t-term-sixel-buffer eat--t-term))
