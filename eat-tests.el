@@ -274,7 +274,7 @@ The following functions are available within BODY:
                (cl-destructuring-bind
                    (&key (width 20) (height 6)) ,spec
                  (eat-term-resize ,term width height))
-               (setf (eat-term-input-function ,term)
+               (setf (eat-term-parameter ,term 'input-function)
                      (lambda (_ str)
                        (setq ,input (concat ,input str))))
                (cl-labels
@@ -5548,7 +5548,7 @@ automatic scrolling as a side effect."
   "Test bell control function."
   (eat--tests-with-term '()
     (let ((bell-rang nil))
-      (setf (eat-term-ring-bell-function (terminal))
+      (setf (eat-term-parameter (terminal) 'ring-bell-function)
             (lambda (term)
               (should (eq term (terminal)))
               (setq bell-rang t)))
@@ -5752,32 +5752,22 @@ Write plain text and newline to move cursor."
 (ert-deftest eat-test-set-cwd ()
   "Test setting current working directory."
   (eat--tests-with-term '()
-    (let ((cwd default-directory)
-          (host (system-name)))
-      (should (string= (car (eat-term-cwd (terminal))) host))
-      (should (string= (cdr (eat-term-cwd (terminal))) cwd))
-      (setf (eat-term-set-cwd-function (terminal))
+    (let ((cwd "nowhere")
+          (host "ghost"))
+      (setf (eat-term-parameter (terminal) 'set-cwd-function)
             (lambda (term hostname dir)
               (should (eq term (terminal)))
               (setq cwd dir)
               (setq host hostname)))
       ;; file://HOST/PATH/.
-      (output (format "\e]51;e;A;%s;%s\e\\"
-                      (base64-encode-string "frob")
-                      (base64-encode-string "/foo/bar/")))
+      (output "\e]7;file://frob/foo/bar/\e\\")
       (should (string= host "frob"))
-      (should (string= (car (eat-term-cwd (terminal))) "frob"))
       (should (string= cwd "/foo/bar/"))
-      (should (string= (cdr (eat-term-cwd (terminal))) "/foo/bar/"))
       (should-term :cursor '(1 . 1))
       ;; file://HOST/PATH (note the missing trailing slash).
-      (output (format "\e]51;e;A;%s;%s\e\\"
-                      (base64-encode-string "foo")
-                      (base64-encode-string "/bar/baz")))
+      (output "\e]7;file://foo/bar/baz\e\\")
       (should (string= host "foo"))
-      (should (string= (car (eat-term-cwd (terminal))) "foo"))
       (should (string= cwd "/bar/baz/"))
-      (should (string= (cdr (eat-term-cwd (terminal))) "/bar/baz/"))
       (should-term :cursor '(1 . 1)))))
 
 
@@ -5849,7 +5839,8 @@ default."
   "Test focus events."
   (eat--tests-with-term '()
     (let ((focus-event-enabled nil))
-      (setf (eat-term-grab-focus-events-function (terminal))
+      (setf (eat-term-parameter (terminal)
+                                'grab-focus-events-function)
             (lambda (term value)
               (should (eq term (terminal)))
               (setq focus-event-enabled value)))
@@ -5873,7 +5864,7 @@ default."
   "Test focus events."
   (eat--tests-with-term '(:width 200 :height 200)
     (cl-letf* ((mouse-mode nil)
-               ((eat-term-grab-mouse-function (terminal))
+               ((eat-term-parameter (terminal) 'grab-mouse-function)
                 (lambda (term mouse)
                   (should (eq term (terminal)))
                   (setq mouse-mode mouse)))
