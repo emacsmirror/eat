@@ -5,7 +5,7 @@
 ;; Author: Akib Azmain Turja <akib@disroot.org>
 ;; Created: 2022-08-15
 ;; Version: 0.8
-;; Package-Requires: ((emacs "28.1") (compat "29.1"))
+;; Package-Requires: ((emacs "27.1") (compat "29.1"))
 ;; Keywords: terminals processes
 ;; Homepage: https://codeberg.org/akib/emacs-eat
 
@@ -81,11 +81,13 @@
 
 ;;; Code:
 
+(require 'compat)
 (require 'subr-x)
 (require 'cl-lib)
 (require 'ansi-color)
 (require 'color)
 (require 'shell)
+(require 'term)
 (require 'url)
 
 ;; Needed by `eat-reload'.
@@ -780,7 +782,11 @@ If your process is choking on big inputs, try lowering the value."
     (dolist (color colors)
       (let ((face (intern (format "eat-term-color-%i" face-counter))))
         (custom-declare-face
-         face `((t :inherit ,(intern (format "ansi-color-%s" color))))
+         face `((t :inherit
+                   ,(intern (format (if (>= emacs-major-version 28)
+                                        "ansi-color-%s"
+                                      "term-color-%s")
+                                    color))))
          (format "Face used to render %s color text." color)
          :group 'eat-term)
         (put (intern (format "eat-term-color-%s" color))
@@ -790,8 +796,11 @@ If your process is choking on big inputs, try lowering the value."
     (dolist (color colors)
       (let ((face (intern (format "eat-term-color-%i" face-counter))))
         (custom-declare-face
-         face `((t :inherit ,(intern (format "ansi-color-bright-%s"
-                                             color))))
+         face `((t :inherit
+                   ,(intern (format (if (>= emacs-major-version 28)
+                                        "ansi-color-bright-%s"
+                                      "term-color-%s")
+                                    color))))
          (format "Face used to render bright %s color text." color)
          :group 'eat-term)
         (put (intern (format "eat-term-color-bright-%s" color))
@@ -3086,7 +3095,7 @@ CHAR-SIZE is the width and height of a character."
                             color-key-length)
                     (mapconcat (lambda (line)
                                  (format "\"%s\",\n" line))
-                               color-map)
+                               color-map "")
                     (mapconcat (lambda (row)
                                  (format "\"%s\"" (string-join
                                                    (nreverse row))))
@@ -5610,6 +5619,8 @@ argument COUNT specifies how many times to insert CHARACTER."
                      (prefix-numeric-value current-prefix-arg)))
   (eat-self-input count character))
 
+(defvar yank-transform-functions) ; In `simple'.
+
 (defun eat-yank (&optional arg)
   "Same as `yank', but for Eat.
 
@@ -5630,8 +5641,14 @@ ARG is passed to `yank', which see."
   "Same as `yank-from-kill-ring', but for Eat.
 
 STRING and ARG are passed to `yank-pop', which see."
-  (interactive (list (read-from-kill-ring "Yank from kill-ring: ")
-                     current-prefix-arg))
+  (interactive
+   (progn
+     (unless (>= emacs-major-version 28)
+       (error "`eat-yank-from-kill-ring' requires at least Emacs 28"))
+     (list (read-from-kill-ring "Yank from kill-ring: ")
+           current-prefix-arg)))
+  (unless (>= emacs-major-version 28)
+    (error "`eat-yank-from-kill-ring' requires at least Emacs 28"))
   (when eat-terminal
     (funcall eat--synchronize-scroll-function
              (eat--synchronize-scroll-windows 'force-selected))
@@ -7182,6 +7199,8 @@ PROGRAM can be a shell command."
 
 (defvar eshell-last-output-start) ; In `esh-mode'.
 (defvar eshell-last-output-end) ; In `esh-mode'.
+(defvar eshell-output-filter-functions) ; In `esh-mode'.
+(defvar eshell-parent-buffer) ; In `em-term'.
 (declare-function eshell-head-process "esh-cmd" ())
 (declare-function eshell-resume-eval "esh-cmd" ())
 
@@ -7242,8 +7261,11 @@ PROGRAM can be a shell command."
   (unless eat-terminal
     (process-put proc 'adjust-window-size-function
                  #'eat--adjust-process-window-size)
-    (setq eat-terminal (eat-term-make (current-buffer)
-                                      (process-mark proc)))
+    (setq eat-terminal
+          (eat-term-make (current-buffer)
+                         (if (marker-buffer (process-mark proc))
+                             (process-mark proc)
+                           (point-max))))
     (set-marker (process-mark proc) (eat-term-end eat-terminal))
     (setf (eat-term-parameter eat-terminal 'input-function)
           #'eat--send-input)
@@ -7385,7 +7407,7 @@ modify its argument to change the filter, the sentinel and invoke
                  ('t t)
                  ('ask (not (y-or-n-p "The program stty can't be \
 found, input won't be shown if terminal emulation is enabled.  \
-Disable terminal emulation?")))
+Disable terminal emulation? ")))
                  ((and (pred functionp) function)
                   (apply function command args)))))
       (funcall fn command args)
@@ -7635,7 +7657,9 @@ symbol `buffer', in which case the point of current buffer is set."
              (member elem
                      '(("TERM" eat--eshell-term-name t)
                        ("TERMINFO" eat-term-terminfo-directory t)
-                       ("INSIDE_EMACS" eat-term-inside-emacs t))))
+                       ("INSIDE_EMACS" eat-term-inside-emacs t)
+                       ("EAT_SHELL_INTEGRATION_DIR"
+                        eat-term-shell-integration-directory t))))
            eshell-variable-aliases-list))
     (advice-remove #'eshell-gather-process-output
                    #'eat--eshell-adjust-make-process-args)
@@ -7822,7 +7846,7 @@ FN, `eat-exec', which see."
           (dolist (var eat--trace-recorded-variables)
             (push (cons var (symbol-value var)) variables)))
         (with-current-buffer buf
-          (lisp-data-mode)
+          (when (fboundp 'lisp-data-mode) (lisp-data-mode))
           (insert ";; -*- mode: lisp-data -*-\n")
           (eat--trace-log time 'create 'eat width height
                           variables))))))
@@ -7947,7 +7971,7 @@ see."
                   (dolist (var eat--trace-recorded-variables)
                     (push (cons var (symbol-value var)) variables))
                   (with-current-buffer buf
-                    (lisp-data-mode)
+                    (when (fboundp 'lisp-data-mode) (lisp-data-mode))
                     (insert ";; -*- lisp-data -*-\n")
                     (eat--trace-log time 'create 'eshell width height
                                     variables)))))))))
