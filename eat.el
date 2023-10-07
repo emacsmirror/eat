@@ -7522,6 +7522,14 @@ symbol `buffer', in which case the point of current buffer is set."
             #'eat--eshell-synchronize-scroll)
       (setq filter-buffer-substring-function
             #'eat--filter-buffer-substring)
+      (make-local-variable 'eshell-variable-aliases-list)
+      (setq eshell-variable-aliases-list
+            `(("TERM" eat--eshell-term-name t)
+              ("TERMINFO" eat-term-terminfo-directory t)
+              ("INSIDE_EMACS" eat-term-inside-emacs t)
+              ("EAT_SHELL_INTEGRATION_DIR"
+               eat-term-shell-integration-directory t)
+              ,@eshell-variable-aliases-list))
       ;; Make sure glyphless character don't display a huge box glyph,
       ;; that would break the display.
       (eat--setup-glyphless-chars)
@@ -7531,7 +7539,17 @@ symbol `buffer', in which case the point of current buffer is set."
      (t
       (when eat-enable-blinking-text
         (eat-blink-mode -1))
-      (mapc #'kill-local-variable locals)))))
+      (mapc #'kill-local-variable locals)
+      (setq eshell-variable-aliases-list
+            (cl-delete-if
+             (lambda (elem)
+               (member elem
+                       '(("TERM" eat--eshell-term-name t)
+                         ("TERMINFO" eat-term-terminfo-directory t)
+                         ("INSIDE_EMACS" eat-term-inside-emacs t)
+                         ("EAT_SHELL_INTEGRATION_DIR"
+                          eat-term-shell-integration-directory t))))
+             eshell-variable-aliases-list))))))
 
 (declare-function eshell-gather-process-output "esh-proc"
                   (command args))
@@ -7618,13 +7636,6 @@ symbol `buffer', in which case the point of current buffer is set."
           (eat--eshell-local-mode +1))))
     (add-hook 'eshell-mode-hook #'eat--eshell-local-mode)
     (add-hook 'eshell-directory-change-hook #'eat--eshell-update-cwd)
-    (setq eshell-variable-aliases-list
-          `(("TERM" eat--eshell-term-name t)
-            ("TERMINFO" eat-term-terminfo-directory t)
-            ("INSIDE_EMACS" eat-term-inside-emacs t)
-            ("EAT_SHELL_INTEGRATION_DIR"
-             eat-term-shell-integration-directory t)
-            ,@eshell-variable-aliases-list))
     (advice-add #'eshell-gather-process-output :around
                 #'eat--eshell-adjust-make-process-args)
     (when (>= emacs-major-version 29)
@@ -7651,16 +7662,6 @@ symbol `buffer', in which case the point of current buffer is set."
     (remove-hook 'eshell-mode-hook #'eat--eshell-local-mode)
     (remove-hook 'eshell-directory-change-hook
                  #'eat--eshell-update-cwd)
-    (setq eshell-variable-aliases-list
-          (cl-delete-if
-           (lambda (elem)
-             (member elem
-                     '(("TERM" eat--eshell-term-name t)
-                       ("TERMINFO" eat-term-terminfo-directory t)
-                       ("INSIDE_EMACS" eat-term-inside-emacs t)
-                       ("EAT_SHELL_INTEGRATION_DIR"
-                        eat-term-shell-integration-directory t))))
-           eshell-variable-aliases-list))
     (advice-remove #'eshell-gather-process-output
                    #'eat--eshell-adjust-make-process-args)
     (when (>= emacs-major-version 29)
