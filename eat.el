@@ -4802,6 +4802,10 @@ return \"eat-color\", otherwise return \"eat-mono\"."
         (when invisible-p
           (delete-region (point) next-change))
         (goto-char next-change)))
+    (remove-text-properties (point-min) (point-max)
+                            '( eat--t-char-width nil
+                               eat--t-sixel-bitmap-size nil
+                               eat--t-sixel-bitmap nil))
     (buffer-string)))
 
 
@@ -6486,14 +6490,17 @@ symbol `buffer', in which case the point of current buffer is set."
 When DELETE is given and non-nil, delete the text between BEGIN and
 END if it's safe to do so."
   (let ((str (buffer-substring begin end)))
-    (remove-text-properties
-     0 (length str)
-     '( eat--before-string nil
-        eat--shell-prompt-mark-id nil
-        eat--shell-prompt-mark-overlay nil
-        eat--shell-prompt-begin nil
-        eat--shell-prompt-end nil)
-     str)
+    (remove-text-properties 0 (length str)
+                            '( read-only nil
+                               rear-nonsticky nil
+                               front-sticky nil
+                               field nil
+                               eat--before-string nil
+                               eat--shell-prompt-mark-id nil
+                               eat--shell-prompt-mark-overlay nil
+                               eat--shell-prompt-begin nil
+                               eat--shell-prompt-end nil)
+                            str)
     (setq str (eat-term-filter-string str))
     (when (and delete
                (or (not eat-terminal)
