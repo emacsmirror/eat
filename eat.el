@@ -5,7 +5,7 @@
 ;; Author: Akib Azmain Turja <akib@disroot.org>
 ;; Created: 2022-08-15
 ;; Version: 0.8
-;; Package-Requires: ((emacs "29.1") (compat "29.1"))
+;; Package-Requires: ((emacs "26.1") (compat "29.1"))
 ;; Keywords: terminals processes
 ;; Homepage: https://codeberg.org/akib/emacs-eat
 
