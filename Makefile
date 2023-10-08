@@ -24,6 +24,7 @@ TEXI2DVI ?= texi2dvi
 TEXI2HTML ?= texi2any --no-split --html
 TEXI2PDF ?= texi2pdf
 TEXI2PS ?= texi2any --ps
+EMACSFLAGS ?=
 
 all: eat.elc terminfo info
 
@@ -54,7 +55,7 @@ terminfo: eat.ti
 		fi
 
 check: eat.el
-	$(EMACS) -batch -l eat.el -l eat-tests.el \
+	$(EMACS) -batch $(EMACSFLAGS) -l eat.el -l eat-tests.el \
 		-f ert-run-tests-batch-and-exit
 
 changelog:
@@ -63,7 +64,8 @@ changelog:
 .PHONY: all terminfo info dvi html pdf check changelog
 
 eat.elc: eat.el
-	$(EMACS) -batch --eval '(byte-compile-file "eat.el")'
+	$(EMACS) -batch $(EMACSFLAGS) \
+		--eval '(byte-compile-file "eat.el")'
 
 eat.info: eat.texi gpl.texi fdl.texi
 	$(TEXI2INFO) eat.texi

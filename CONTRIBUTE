@@ -36,10 +36,11 @@ patch.
 ** Testing your changes
 
 Please test your changes before committing them or sending them to the
-list.  "make check" runs all the tests.  If possible, add a new test
-along with any bug fix or new functionality you commit (of course,
-some changes cannot be easily tested, but the terminal emulator part
-should be as much tested as possible).
+list.  "make check" runs all the tests.  You will need to set
+"EMACSFLAGS" so that the checker can find the dependencies.  If
+possible, add a new test along with any bug fix or new functionality
+you commit (of course, some changes cannot be easily tested, but the
+terminal emulator part should be as much tested as possible).
 
 Eat uses ERT, Emacs Lisp Regression Testing, for testing.  See
 https://www.gnu.org/software/emacs/manual/html_node/ert/ or run
