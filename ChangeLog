@@ -1,3 +1,13 @@
+2023-10-09  Akib Azmain Turja  <akib@disroot.org>
+
+	Remove internal text properties when killing text
+
+	* eat.el (eat-term-filter-string): Remove 'read-only',
+	'rear-nonsticky', 'front-sticky' and 'field' text properties.
+	* eat.el (eat--filter-buffer-substring): Remove
+	'eat--t-char-width', 'eat--t-sixel-bitmap-size' and
+	'eat--t-sixel-bitmap' text properties.
+
 2023-10-08  Akib Azmain Turja  <akib@disroot.org>
 
 	Fix Makefile
