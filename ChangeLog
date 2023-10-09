@@ -1,3 +1,30 @@
+2023-10-10  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix 'eat--set-term-sixel-params' on text display
+
+	* eat.el (eat--set-term-sixel-params): Don't error on text
+	display.
+
+2023-10-09  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix 'eat--eshell-set-input-process' advice
+
+	* eat.el (eat--eshell-set-input-process): Take any number of
+	arguments and ignore them.
+
+2023-10-09  Akib Azmain Turja  <akib@disroot.org>
+
+	Make motion commands work properly
+
+	* eat.el (eat--line-mode): Set 'front-sticky' and
+	'rear-nonsticky' text properties to 't' when enabling mode, and
+	revert them when disabling.
+	* eat.el (eat--process-output-queue): Don't add 'front-sticky'
+	and 'rear-nonsticky' text properties if not in line mode.
+	* eat.el (eat--sentinel): Don't remove 'front-sticky' and
+	'rear-nonsticky' text properties, they shouldn't be in the
+	buffer.
+
 2023-10-09  Akib Azmain Turja  <akib@disroot.org>
 
 	Remove internal text properties when killing text
