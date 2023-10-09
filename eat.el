@@ -5086,9 +5086,7 @@ selection, or nil if none."
             ('half-block '(1 . 2))
             (_ (cons (default-font-width) (default-font-height)))))
          (scale-x (* eat-sixel-aspect-ratio eat-sixel-scale))
-         (scale-y eat-sixel-scale)
-         (font-size (font-get (font-spec :name (face-font 'default))
-                              :size)))
+         (scale-y eat-sixel-scale))
     (setf (car dimensions) (max 1 (round (/ (car dimensions)
                                             (float scale-x)))))
     (setf (cdr dimensions) (max 1 (round (/ (cdr dimensions)
@@ -5098,13 +5096,17 @@ selection, or nil if none."
     (setf (eat-term-parameter eat-terminal 'char-dimensions)
           dimensions)
     (unless (memq render-fmt '(none background half-block))
-      (setf
-       (eat-term-parameter eat-terminal 'sixel-image-extra-properties)
-       `( :ascent center
-          :height ,(cons (/ (float (default-font-height)) font-size)
-                         'em)
-          :width ,(cons (/ (float (default-font-width)) font-size)
-                        'em))))))
+      (let ((font-size
+             (font-get (font-spec :name (face-font 'default))
+                       :size)))
+        (setf
+         (eat-term-parameter eat-terminal
+                             'sixel-image-extra-properties)
+         `( :ascent center
+            :height ,(cons (/ (float (default-font-height)) font-size)
+                           'em)
+            :width ,(cons (/ (float (default-font-width)) font-size)
+                          'em)))))))
 
 (defun eat--set-cwd (_ host cwd)
   "Set CWD as the current working directory (`default-directory').
