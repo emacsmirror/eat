@@ -7480,7 +7480,7 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
               (funcall fn command args))))
         (remove-hook 'eshell-exec-hook hook)))))
 
-(defun eat--eshell-set-input-process ()
+(defun eat--eshell-set-input-process (&rest _)
   "Set the process that gets user input."
   (when eat-terminal
     (setf (eat-term-parameter eat-terminal 'eat--input-process)
