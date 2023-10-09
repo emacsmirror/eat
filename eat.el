@@ -5087,10 +5087,9 @@ selection, or nil if none."
             (_ (cons (default-font-width) (default-font-height)))))
          (scale-x (* eat-sixel-aspect-ratio eat-sixel-scale))
          (scale-y eat-sixel-scale))
-    (setf (car dimensions) (max 1 (round (/ (car dimensions)
-                                            (float scale-x)))))
-    (setf (cdr dimensions) (max 1 (round (/ (cdr dimensions)
-                                            (float scale-y)))))
+    (setq dimensions
+          (cons (max 1 (round (/ (car dimensions) (float scale-x))))
+                (max 1 (round (/ (cdr dimensions) (float scale-y))))))
     (setf (eat-term-parameter eat-terminal 'sixel-render-format)
           render-fmt)
     (setf (eat-term-parameter eat-terminal 'char-dimensions)
