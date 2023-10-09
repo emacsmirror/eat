@@ -5909,8 +5909,19 @@ MODE should one of:
   :interactive nil
   :keymap eat-line-mode-map
   (if eat--line-mode
-      (add-hook 'pre-command-hook #'eat--line-move-to-input nil t)
-    (remove-hook 'pre-command-hook #'eat--line-move-to-input t)))
+      (let ((inhibit-read-only t))
+        (add-hook 'pre-command-hook #'eat--line-move-to-input nil t)
+        (add-text-properties (eat-term-beginning eat-terminal)
+                             (eat-term-end eat-terminal)
+                             '(front-sticky t rear-nonsticky t)))
+    (remove-hook 'pre-command-hook #'eat--line-move-to-input t)
+    (let ((inhibit-read-only t))
+      (when (/= (eat-term-beginning eat-terminal)
+                (eat-term-end eat-terminal))
+        (remove-text-properties
+         (eat-term-beginning eat-terminal)
+         (eat-term-end eat-terminal)
+         '(front-sticky nil rear-nonsticky nil))))))
 
 (defun eat-line-mode ()
   "Switch to line mode."
@@ -6766,8 +6777,9 @@ OS's."
             (add-text-properties
              (eat-term-beginning eat-terminal)
              (eat-term-end eat-terminal)
-             '( read-only t rear-nonsticky t front-sticky t
-                field eat-terminal))))
+             `( read-only t field eat-terminal
+                ,@(when eat--line-mode
+                    '(front-sticky t rear-nonsticky t))))))
         (funcall eat--synchronize-scroll-function sync-windows))
       (run-hooks 'eat-update-hook))))
 
@@ -6832,8 +6844,7 @@ to it."
               (remove-text-properties
                (eat-term-beginning eat-terminal)
                (eat-term-end eat-terminal)
-               '( read-only nil rear-nonsticky nil front-sticky nil
-                  field nil))
+               '(read-only nil field nil))
               (eat-term-delete eat-terminal)
               (setq eat-terminal nil)
               (eat--set-cursor nil :default)
