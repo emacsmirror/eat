@@ -6483,10 +6483,14 @@ symbol `buffer', in which case the point of current buffer is set."
   (dolist (window windows)
     (if (eq window 'buffer)
         (goto-char (eat-term-display-cursor eat-terminal))
-      (set-window-start
-       window (eat-term-display-beginning eat-terminal))
-      (set-window-point
-       window (eat-term-display-cursor eat-terminal)))))
+      (with-selected-window window
+        (set-window-point nil (eat-term-display-cursor eat-terminal))
+        (recenter
+         (- (how-many "\n" (eat-term-display-beginning eat-terminal)
+                      (eat-term-display-cursor eat-terminal))
+            (cdr (eat-term-size eat-terminal))
+            (max 0 (- (floor (window-screen-lines))
+                      (cdr (eat-term-size eat-terminal))))))))))
 
 (defun eat--setup-glyphless-chars ()
   "Setup the display of glyphless characters."
@@ -7498,24 +7502,11 @@ symbol `buffer', in which case the point of current buffer is set."
   (dolist (window windows)
     (if (eq window 'buffer)
         (goto-char (eat-term-display-cursor eat-terminal))
-      (set-window-start
-       window
-       (if (or (eat-term-in-alternative-display-p eat-terminal)
-               eat--eshell-char-mode)
-           (eat-term-display-beginning eat-terminal)
-         (save-restriction
-           (narrow-to-region (eat-term-beginning eat-terminal)
-                             (eat-term-end eat-terminal))
-           (let ((start-line (- (floor (window-screen-lines))
-                                (line-number-at-pos (point-max)))))
-             (goto-char (point-min))
-             (widen)
-             (if (<= start-line 0)
-                 (eat-term-display-beginning eat-terminal)
-               (vertical-motion (- start-line))
-               (point))))))
-      (set-window-point
-       window (eat-term-display-cursor eat-terminal)))))
+      (with-selected-window window
+        (set-window-point nil (eat-term-display-cursor eat-terminal))
+        (recenter
+         (- (1+ (how-many "\n" (eat-term-display-cursor eat-terminal)
+                          (eat-term-end eat-terminal)))))))))
 
 (defun eat--eshell-update-cwd ()
   "Update the current working directory."
