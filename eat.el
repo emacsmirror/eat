@@ -783,7 +783,8 @@ If your process is choking on big inputs, try lowering the value."
       (let ((face (intern (format "eat-term-color-%i" face-counter))))
         (custom-declare-face
          face `((t :inherit
-                   ,(intern (format (if (>= emacs-major-version 28)
+                   ,(intern (format (if (eval-when-compile
+                                          (>= emacs-major-version 28))
                                         "ansi-color-%s"
                                       "term-color-%s")
                                     color))))
@@ -797,7 +798,8 @@ If your process is choking on big inputs, try lowering the value."
       (let ((face (intern (format "eat-term-color-%i" face-counter))))
         (custom-declare-face
          face `((t :inherit
-                   ,(intern (format (if (>= emacs-major-version 28)
+                   ,(intern (format (if (eval-when-compile
+                                          (>= emacs-major-version 28))
                                         "ansi-color-bright-%s"
                                       "term-color-%s")
                                     color))))
@@ -4454,7 +4456,8 @@ client process may get confused."
                   (pos (if (memq 'drag modifiers)
                            (event-end mouse)
                          (event-start mouse)))
-                  (x-y (if (< emacs-major-version 29)
+                  (x-y (if (eval-when-compile
+                             (< emacs-major-version 29))
                            (posn-col-row pos)
                          (with-suppressed-warnings
                              ((callargs posn-col-row))
@@ -4474,7 +4477,8 @@ client process may get confused."
                      b)))
              (when ref-pos
                (let ((ref-x-y
-                      (if (< emacs-major-version 29)
+                      (if (eval-when-compile
+                            (< emacs-major-version 29))
                           (posn-col-row ref-pos)
                         (with-suppressed-warnings
                             ((callargs posn-col-row))
@@ -4552,7 +4556,8 @@ client process may get confused."
                 (pred mouse-movement-p)
                 movement)
            (let* ((pos (event-start movement))
-                  (x-y (if (< emacs-major-version 29)
+                  (x-y (if (eval-when-compile
+                             (< emacs-major-version 29))
                            (posn-col-row pos)
                          (with-suppressed-warnings
                              ((callargs posn-col-row))
@@ -4566,7 +4571,8 @@ client process may get confused."
                      35)))
              (when ref-pos
                (let ((ref-x-y
-                      (if (< emacs-major-version 29)
+                      (if (eval-when-compile
+                            (< emacs-major-version 29))
                           (posn-col-row ref-pos)
                         (with-suppressed-warnings
                             ((callargs posn-col-row))
@@ -5663,11 +5669,11 @@ ARG is passed to `yank', which see."
 STRING and ARG are passed to `yank-pop', which see."
   (interactive
    (progn
-     (unless (>= emacs-major-version 28)
+     (unless (eval-when-compile (>= emacs-major-version 28))
        (error "`eat-yank-from-kill-ring' requires at least Emacs 28"))
      (list (read-from-kill-ring "Yank from kill-ring: ")
            current-prefix-arg)))
-  (unless (>= emacs-major-version 28)
+  (unless (eval-when-compile (>= emacs-major-version 28))
     (error "`eat-yank-from-kill-ring' requires at least Emacs 28"))
   (when eat-terminal
     (funcall eat--synchronize-scroll-function
@@ -6752,22 +6758,21 @@ OS's."
 
 (defun eat--process-input-queue (buffer)
   "Process the input queue on BUFFER."
-  (setf (buffer-local-value 'eat--process-input-queue-timer buffer)
-        nil)
-  (when-let* (((buffer-live-p buffer))
-              (terminal (buffer-local-value 'eat-terminal buffer))
-              (proc (eat-term-parameter terminal 'eat--process))
-              ((process-live-p proc)))
+  (when (buffer-live-p buffer)
     (with-current-buffer buffer
       ;; We don't want to recurse this function.
       (unless eat--defer-input-processing
-        (let ((inhibit-quit t)        ; Don't disturb!
-              (eat--defer-input-processing t))
-          (while eat--pending-input-chunks
-            (let ((chunks (nreverse eat--pending-input-chunks)))
-              (setq eat--pending-input-chunks nil)
-              (dolist (str chunks)
-                (eat--send-string proc str)))))))))
+        (let ((inhibit-quit t)          ; Don't disturb!
+              (eat--defer-input-processing t)
+              (proc (eat-term-parameter eat-terminal 'eat--process)))
+          (when (process-live-p proc)
+            (while eat--pending-input-chunks
+              (let ((chunks (nreverse eat--pending-input-chunks)))
+                (setq eat--pending-input-chunks nil)
+                (dolist (str chunks)
+                  (eat--send-string proc str)))))))
+      (when eat--process-input-queue-timer
+        (cancel-timer eat--process-input-queue-timer)))))
 
 (defun eat--process-output-queue (buffer)
   "Process the output queue on BUFFER."
@@ -7331,7 +7336,7 @@ PROGRAM can be a shell command."
           #'eat--eshell-handle-uic)
     (eat--set-term-sixel-params)
     (setf (eat-term-parameter eat-terminal 'eat--process) proc)
-    (unless (>= emacs-major-version 29)
+    (unless (eval-when-compile (>= emacs-major-version 29))
       (setf (eat-term-parameter eat-terminal 'eat--input-process)
             proc))
     (setf (eat-term-parameter eat-terminal 'eat--output-process) proc)
@@ -7359,9 +7364,12 @@ PROGRAM can be a shell command."
       (set-marker eshell-last-output-end (point))
       (eat--cursor-blink-mode -1)
       (eat--grab-mouse nil nil)
-      (set-process-filter (eat-term-parameter
-                           eat-terminal 'eat--output-process)
-                          #'eshell-output-filter)
+      (set-process-filter
+       (eat-term-parameter
+        eat-terminal 'eat--output-process)
+       (if (eval-when-compile (< emacs-major-version 30))
+           #'eshell-output-filter
+         #'eshell-interactive-process-filter))
       (eat-term-delete eat-terminal)
       (setq eat-terminal nil)
       (kill-local-variable 'eshell-output-filter-functions)
@@ -7372,6 +7380,8 @@ PROGRAM can be a shell command."
     (run-hooks 'eat-eshell-exit-hook)))
 
 (declare-function eshell-output-filter "esh-mode" (process string))
+(declare-function eshell-interactive-process-filter "esh-mode"
+                  (process string))
 
 (defun eat--eshell-process-output-queue (process buffer)
   "Process the output queue on BUFFER from PROCESS."
@@ -7382,15 +7392,18 @@ PROGRAM can be a shell command."
       (setq eat--output-queue-first-chunk-time nil)
       (let ((queue eat--pending-output-chunks))
         (setq eat--pending-output-chunks nil)
-        (if (< emacs-major-version 27)
+        (if (eval-when-compile (< emacs-major-version 27))
             (eshell-output-filter
              process (string-join (nreverse queue)))
           (combine-change-calls
-           (eat-term-beginning eat-terminal)
-           (eat-term-end eat-terminal)
-           ;; TODO: Is `string-join' OK or should we use a loop?
-           (eshell-output-filter
-            process (string-join (nreverse queue)))))))))
+              (eat-term-beginning eat-terminal)
+              (eat-term-end eat-terminal)
+            ;; TODO: Is `string-join' OK or should we use a loop?
+            (if (eval-when-compile (< emacs-major-version 30))
+                (eshell-output-filter
+                 process (string-join (nreverse queue)))
+              (eshell-interactive-process-filter
+               process (string-join (nreverse queue))))))))))
 
 (defun eat--eshell-filter (process string)
   "Process output STRING from PROCESS."
@@ -7469,7 +7482,7 @@ Disable terminal emulation? ")))
       (unwind-protect
           (cond
            ;; Emacs 29 and above.
-           ((>= emacs-major-version 29)
+           ((eval-when-compile (>= emacs-major-version 29))
             (cl-letf*
                 ((make-process (symbol-function #'make-process))
                  ((symbol-function #'make-process)
@@ -7662,7 +7675,7 @@ symbol `buffer', in which case the point of current buffer is set."
       (dolist (buffer (buffer-list))
         (with-current-buffer buffer
           (when (eq major-mode #'eshell-mode)
-            (when (if (< emacs-major-version 29)
+            (when (if (eval-when-compile (< emacs-major-version 29))
                       (bound-and-true-p eshell-last-async-proc)
                     (bound-and-true-p eshell-last-async-procs))
               (user-error
@@ -7677,7 +7690,7 @@ symbol `buffer', in which case the point of current buffer is set."
     (add-hook 'eshell-directory-change-hook #'eat--eshell-update-cwd)
     (advice-add #'eshell-gather-process-output :around
                 #'eat--eshell-adjust-make-process-args)
-    (when (>= emacs-major-version 29)
+    (when (eval-when-compile (>= emacs-major-version 29))
       (advice-add #'eshell-resume-eval :after
                   #'eat--eshell-set-input-process)))
    (t
@@ -7687,7 +7700,7 @@ symbol `buffer', in which case the point of current buffer is set."
         (with-current-buffer buffer
           (when (and (eq major-mode #'eshell-mode)
                      eat--eshell-local-mode)
-            (when (if (< emacs-major-version 29)
+            (when (if (eval-when-compile (< emacs-major-version 29))
                       (bound-and-true-p eshell-last-async-proc)
                     (bound-and-true-p eshell-last-async-procs))
               (user-error
@@ -7703,7 +7716,7 @@ symbol `buffer', in which case the point of current buffer is set."
                  #'eat--eshell-update-cwd)
     (advice-remove #'eshell-gather-process-output
                    #'eat--eshell-adjust-make-process-args)
-    (when (>= emacs-major-version 29)
+    (when (eval-when-compile (>= emacs-major-version 29))
       (advice-remove #'eshell-resume-eval
                      #'eat--eshell-set-input-process)))))
 
