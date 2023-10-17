@@ -5002,6 +5002,11 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 (defvar eat--auto-line-mode-prev-mode nil
   "The input mode active before line mode.")
 
+(defvar eat--auto-line-mode-pending-toggles nil
+  "Automatic line mode toggles left to do.
+
+Don't change the toplevel value of this, let-bind instead.")
+
 (defun eat-reset ()
   "Perform a terminal reset."
   (interactive)
@@ -5147,47 +5152,64 @@ If HOST isn't the host Emacs is running on, don't do anything."
 (defvar eat--semi-char-mode)
 (defvar eat--char-mode)
 
-(defun eat--line-mode-enter-auto-1 (buffer)
-  "Enter line mode in BUFFER."
-  (with-current-buffer buffer
-    (unless (or eat--inhibit-auto-line-mode eat--line-mode)
-      (unless eat--line-mode
-        (setq eat--auto-line-mode-prev-mode
-              (cond (eat--semi-char-mode 'semi-char)
-                    (eat--char-mode 'char)
-                    (t 'emacs)))
-        (eat-line-mode)
-        ;; We're entering automatically, so we should be able to exit it
-        ;; automatically.
-        (setq eat--inhibit-auto-line-mode nil)))))
+(defun eat--line-mode-enter-auto-1 ()
+  "Enter line mode."
+  (unless (or eat--inhibit-auto-line-mode eat--line-mode)
+    (unless eat--line-mode
+      (setq eat--auto-line-mode-prev-mode
+            (cond (eat--semi-char-mode 'semi-char)
+                  (eat--char-mode 'char)
+                  (t 'emacs)))
+      (eat-line-mode)
+      ;; We're entering automatically, so we should be able to exit it
+      ;; automatically.
+      (setq eat--inhibit-auto-line-mode nil))))
 
 (defun eat--line-mode-enter-auto ()
-  "Enter line mode."
-  (run-with-idle-timer 0 nil #'eat--line-mode-enter-auto-1
-                       (current-buffer)))
+  "Arrange that line mode will be enabled eventually."
+  (push 'enter eat--auto-line-mode-pending-toggles))
 
-(defun eat--line-mode-exit-auto-1 (buffer)
-  "Exit line mode in BUFFER."
-  (with-current-buffer buffer
-    (when (and (not eat--inhibit-auto-line-mode)
-               eat--auto-line-mode-prev-mode)
-      (pcase eat--auto-line-mode-prev-mode
-        ('emacs (eat-emacs-mode))
-        ('semi-char (eat-semi-char-mode))
-        ('char (eat-char-mode)))
-      (setq eat--auto-line-mode-prev-mode nil)
-      (when (/= (eat-term-end eat-terminal) (point-max))
-        (eat-line-send))
-      ;; Toggle line mode _after_ we exit from
-      ;; `eat-term-process-output'.
-      (run-with-idle-timer 0 nil #'eat-line-mode)
-      (eat--line-mode -1)
-      (setq buffer-undo-list nil))))
+(defun eat--line-mode-exit-auto-1 ()
+  "Exit line mode."
+  (when (and (not eat--inhibit-auto-line-mode)
+             eat--auto-line-mode-prev-mode)
+    (pcase eat--auto-line-mode-prev-mode
+      ('emacs (eat-emacs-mode))
+      ('semi-char (eat-semi-char-mode))
+      ('char (eat-char-mode)))
+    (setq eat--auto-line-mode-prev-mode nil)
+    (when (/= (eat-term-end eat-terminal) (point-max))
+      (eat-line-send))
+    ;; Toggle line mode _after_ we exit from
+    ;; `eat-term-process-output'.
+    (eat--line-mode -1)
+    (setq buffer-undo-list nil)))
 
 (defun eat--line-mode-exit-auto ()
-  "Exit line mode."
-  (run-with-idle-timer 0 nil #'eat--line-mode-exit-auto-1
-                       (current-buffer)))
+  "Arrange that line mode will be disabled eventually."
+  (push 'exit eat--auto-line-mode-pending-toggles))
+
+(defun eat--line-mode-do-toggles ()
+  "Do the pending line mode toggle."
+  (let* ((inhibit-quit t)
+         (actions (nreverse eat--auto-line-mode-pending-toggles))
+         (toggle nil))
+    (while (setq toggle (pop actions))
+      (pcase-exhaustive toggle
+        ('enter (eat--line-mode-enter-auto-1))
+        ('exit (eat--line-mode-exit-auto-1)))
+      ;; Don't do extra unnecessary toggles.
+      (let ((loop t))
+        (while loop
+          (setq loop nil)
+          (while (eq toggle (car actions))
+            (pop actions))
+          (while (and (car actions) (cadr actions)
+                      (not (eq (car actions) (cadr actions))))
+            (pop actions)
+            (pop actions)
+            (setq loop t)))))
+    (setq eat--auto-line-mode-pending-toggles nil)))
 
 (defun eat--post-prompt ()
   "Put a mark in the marginal area and enter line mode."
@@ -6772,14 +6794,16 @@ OS's."
                 (dolist (str chunks)
                   (eat--send-string proc str)))))))
       (when eat--process-input-queue-timer
-        (cancel-timer eat--process-input-queue-timer)))))
+        (cancel-timer eat--process-input-queue-timer))
+      (setq eat--process-input-queue-timer nil))))
 
 (defun eat--process-output-queue (buffer)
   "Process the output queue on BUFFER."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (let ((inhibit-quit t)        ; Don't disturb!
-            (sync-windows (eat--synchronize-scroll-windows)))
+            (sync-windows (eat--synchronize-scroll-windows))
+            (eat--auto-line-mode-pending-toggles nil))
         (save-restriction
           (widen)
           (let ((inhibit-read-only t)
@@ -6814,6 +6838,7 @@ OS's."
              `( read-only t field eat-terminal
                 ,@(when eat--line-mode
                     '(front-sticky t rear-nonsticky t))))))
+        (eat--line-mode-do-toggles)
         (funcall eat--synchronize-scroll-function sync-windows))
       (run-hooks 'eat-update-hook))))
 
