@@ -5141,32 +5141,47 @@ If HOST isn't the host Emacs is running on, don't do anything."
 (defvar eat--semi-char-mode)
 (defvar eat--char-mode)
 
+(defun eat--line-mode-enter-auto-1 (buffer)
+  "Enter line mode in BUFFER."
+  (with-current-buffer buffer
+    (unless (or eat--inhibit-auto-line-mode eat--line-mode)
+      (unless eat--line-mode
+        (setq eat--auto-line-mode-prev-mode
+              (cond (eat--semi-char-mode 'semi-char)
+                    (eat--char-mode 'char)
+                    (t 'emacs)))
+        (eat-line-mode)
+        ;; We're entering automatically, so we should be able to exit it
+        ;; automatically.
+        (setq eat--inhibit-auto-line-mode nil)))))
+
 (defun eat--line-mode-enter-auto ()
   "Enter line mode."
-  (unless (or eat--inhibit-auto-line-mode eat--line-mode)
-    (unless eat--line-mode
-      (setq eat--auto-line-mode-prev-mode
-            (cond (eat--semi-char-mode 'semi-char)
-                  (eat--char-mode 'char)
-                  (t 'emacs)))
-      (eat-line-mode)
-      ;; We're entering automatically, so we should be able to exit it
-      ;; automatically.
-      (setq eat--inhibit-auto-line-mode nil))))
+  (run-with-idle-timer 0 nil #'eat--line-mode-enter-auto-1
+                       (current-buffer)))
+
+(defun eat--line-mode-exit-auto-1 (buffer)
+  "Exit line mode in BUFFER."
+  (with-current-buffer buffer
+    (when (and (not eat--inhibit-auto-line-mode)
+               eat--auto-line-mode-prev-mode)
+      (pcase eat--auto-line-mode-prev-mode
+        ('emacs (eat-emacs-mode))
+        ('semi-char (eat-semi-char-mode))
+        ('char (eat-char-mode)))
+      (setq eat--auto-line-mode-prev-mode nil)
+      (when (/= (eat-term-end eat-terminal) (point-max))
+        (eat-line-send))
+      ;; Toggle line mode _after_ we exit from
+      ;; `eat-term-process-output'.
+      (run-with-idle-timer 0 nil #'eat-line-mode)
+      (eat--line-mode -1)
+      (setq buffer-undo-list nil))))
 
 (defun eat--line-mode-exit-auto ()
   "Exit line mode."
-  (when (and (not eat--inhibit-auto-line-mode)
-             eat--auto-line-mode-prev-mode)
-    (pcase eat--auto-line-mode-prev-mode
-      ('emacs (eat-emacs-mode))
-      ('semi-char (eat-semi-char-mode))
-      ('char (eat-char-mode)))
-    (setq eat--auto-line-mode-prev-mode nil)
-    (when (/= (eat-term-end eat-terminal) (point-max))
-      (eat-line-send))
-    (eat--line-mode -1)
-    (setq buffer-undo-list nil)))
+  (run-with-idle-timer 0 nil #'eat--line-mode-exit-auto-1
+                       (current-buffer)))
 
 (defun eat--post-prompt ()
   "Put a mark in the marginal area and enter line mode."
