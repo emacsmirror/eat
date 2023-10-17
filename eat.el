@@ -6572,6 +6572,7 @@ END if it's safe to do so."
           isearch-push-state-function
           eat--pending-input-chunks
           eat--process-input-queue-timer
+          eat--defer-input-processing
           eat--pending-output-chunks
           eat--output-queue-first-chunk-time
           eat--process-output-queue-timer
@@ -6711,6 +6712,9 @@ The input chunks are pushed, so last input appears first.")
 (defvar eat--process-input-queue-timer nil
   "Timer to process input queue.")
 
+(defvar eat--defer-input-processing nil
+  "Non-nil meaning process input later.")
+
 (defvar eat--shell-prompt-annotation-correction-timer nil
   "Timer to correct shell prompt annotations.")
 
@@ -6755,10 +6759,15 @@ OS's."
               (proc (eat-term-parameter terminal 'eat--process))
               ((process-live-p proc)))
     (with-current-buffer buffer
-      (let ((chunks (nreverse eat--pending-input-chunks)))
-        (setq eat--pending-input-chunks nil)
-        (dolist (str chunks)
-          (eat--send-string proc str))))))
+      ;; We don't want to recurse this function.
+      (unless eat--defer-input-processing
+        (let ((inhibit-quit t)        ; Don't disturb!
+              (eat--defer-input-processing t))
+          (while eat--pending-input-chunks
+            (let ((chunks (nreverse eat--pending-input-chunks)))
+              (setq eat--pending-input-chunks nil)
+              (dolist (str chunks)
+                (eat--send-string proc str)))))))))
 
 (defun eat--process-output-queue (buffer)
   "Process the output queue on BUFFER."
@@ -7541,6 +7550,7 @@ symbol `buffer', in which case the point of current buffer is set."
                   eat--mouse-grabbing-type
                   eat--pending-input-chunks
                   eat--process-input-queue-timer
+                  eat--defer-input-processing
                   eat--pending-output-chunks
                   eat--output-queue-first-chunk-time
                   eat--process-output-queue-timer
