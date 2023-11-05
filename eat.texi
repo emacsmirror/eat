@@ -567,8 +567,9 @@ the command entered in that prompt.
 @end defopt
 
 Eat uses the marginal area
-(@pxref{Display Margins,,, emacs, GNU Emacs Manual}) on the left side
-to display the annotation.  You also use the right margin.
+(@pxref{Display Margins,,, elisp, GNU Emacs Lisp Reference Manual}) on
+the left side to display the annotation.  You also use the right
+margin.
 
 @vindex eat-shell-prompt-annotation-position
 @defopt eat-shell-prompt-annotation-position
