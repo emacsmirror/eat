@@ -944,7 +944,7 @@ normal.  Faint text uses the face @code{eat-term-faint}.
 @cindex text, slant
 @vindex eat-term-italic
 Programs may request the terminal to show italic text too.  Italic
-text uses the customizable face @code{eat-term-faint}.
+text uses the customizable face @code{eat-term-italic}.
 
 @cindex font family
 @cindex text, font family
