@@ -5829,6 +5829,7 @@ EVENT is the mouse event."
                 #'eat-line-previous-matching-input-from-input)
     (define-key map [?\C-c ?\M-s]
                 #'eat-line-next-matching-input-from-input)
+    (define-key map [xterm-paste] #'xterm-paste)
     map)
   "Keymap for Eat line mode.")
 
