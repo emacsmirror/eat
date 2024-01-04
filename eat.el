@@ -89,6 +89,8 @@
 (require 'shell)
 (require 'term)
 (require 'url)
+(require 'tramp)
+(require 'term/xterm)
 
 ;; Needed by `eat-reload'.
 (defvar eat--being-loaded nil
@@ -116,6 +118,26 @@
 (defgroup eat-eshell nil
   "Eat Eshell integration."
   :group 'eat)
+
+(defcustom eat-default-shell-function #'eat-default-shell
+  "Function to call to get the default shell to run."
+  :type 'function
+  :group 'eat-ui)
+
+(defcustom eat-shell (or explicit-shell-file-name
+                         (getenv "ESHELL")
+                         shell-file-name)
+  "Default shell to run."
+  :type 'string
+  :group 'eat-ui)
+
+(defcustom eat-tramp-shells '(("docker" "/bin/sh"))
+  "Alist specifying the shells to run in Tramp.
+
+Each element of form (TRAMP-METHOD SHELL), where SHELL corresponds to
+the default shell for remote directories using TRAMP-METHOD."
+  :type '(alist :key-type string :value-type string)
+  :group 'eat-ui)
 
 (defcustom eat-buffer-name "*eat*"
   "The basename used for Eat buffers.
@@ -7043,14 +7065,19 @@ PROGRAM."
       (eat-exec buffer name program startfile switches))
     buffer))
 
+(defun eat-default-shell ()
+  "Return a shell to run."
+  (or (and (file-remote-p default-directory)
+           (with-parsed-tramp-file-name default-directory nil
+             (alist-get method eat-tramp-shells)))
+      eat-shell))
+
 (defun eat--1 (program arg display-buffer-fn)
   "Start a new Eat terminal emulator in a buffer.
 
 PROGRAM and ARG is same as in `eat' and `eat-other-window'.
 DISPLAY-BUFFER-FN is the function to display the buffer."
-  (let ((program (or program (or explicit-shell-file-name
-                                 (getenv "ESHELL")
-                                 shell-file-name)))
+  (let ((program (or program (funcall eat-default-shell-function)))
         (buffer
          (cond
           ((numberp arg)
@@ -7089,9 +7116,7 @@ PROGRAM can be a shell command."
   (interactive
    (list (when (equal current-prefix-arg '(16))
            (read-shell-command "Run program: "
-                               (or explicit-shell-file-name
-                                   (getenv "ESHELL")
-                                   shell-file-name)))
+                               (funcall eat-default-shell-function)))
          current-prefix-arg))
   (eat--1 program arg #'pop-to-buffer-same-window))
 

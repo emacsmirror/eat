@@ -67,6 +67,7 @@ Basic Operations
 Advanced Customizations
 * Shell Integration::   Getting the most from Eat and your shell.
 * Querying Before Kill::  Confirming before you kill your terminal.
+* Changing Shell::      Changing the default shell.
 * Display::             The region where everything is shown.
 * Scrollback::          Region for things that went out of display.
 * Cursor Types::        Cursor can displayed in many forms.
@@ -674,6 +675,39 @@ in the terminal.  This is effective only after shell integration is
 enabled in the shell (@pxref{Shell Integration}) (i.e. after the shell
 integration code is executed on shell); before that it is essentially
 same as @code{t}, and Eat will always query.
+@end defopt
+
+@node Changing Shell
+@cindex changing default shell
+@cindex changing shell
+@cindex shell, default, changing
+@cindex default, shell changing
+@cindex shell, changing shell
+@chapter Changing the Default Shell
+
+Eat automatically uses a reasonable shell by default.  However you can
+customize it.
+
+@vindex eat-shell
+@defopt eat-shell
+The default shell to run.
+@end defopt
+
+@vindex eat-tramp-shells
+@defopt eat-tramp-shells
+This user options allows you to customize default shell for each Tramp
+method.  It's an alist and it's elements are of form (TRAMP-METHOD
+SHELL).
+@end defopt
+
+@vindex eat-default-shell-function
+@defopt eat-default-shell-function
+This user options gives more control on the default shell.  It
+specifies a function to call without any argument, whose return value
+is used as the default shell.
+
+If you change this from the default value, @code{eat-shell} and
+@code{eat-tramp-shells} won't work.
 @end defopt
 
 @node Display
