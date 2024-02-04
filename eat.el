@@ -131,11 +131,11 @@
   :type 'string
   :group 'eat-ui)
 
-(defcustom eat-tramp-shells '(("docker" "/bin/sh"))
+(defcustom eat-tramp-shells '(("docker" . "/bin/sh"))
   "Alist specifying the shells to run in Tramp.
 
-Each element of form (TRAMP-METHOD SHELL), where SHELL corresponds to
-the default shell for remote directories using TRAMP-METHOD."
+Each element of form (TRAMP-METHOD . SHELL), where SHELL corresponds
+to the default shell for remote directories using TRAMP-METHOD."
   :type '(alist :key-type string :value-type string)
   :group 'eat-ui)
 
@@ -7069,7 +7069,7 @@ PROGRAM."
   "Return a shell to run."
   (or (and (file-remote-p default-directory)
            (with-parsed-tramp-file-name default-directory nil
-             (alist-get method eat-tramp-shells)))
+             (alist-get method eat-tramp-shells nil nil 'equal)))
       eat-shell))
 
 (defun eat--1 (program arg display-buffer-fn)
