@@ -461,11 +461,11 @@ By default, every keystroke gets recorded in the lossage, which can be
 seen by pressing @kbd{C-h l}.  This is actually a good thing, unless
 you're inputting password.
 
-@findex eat-send-command
+@findex eat-send-password
 Emacs doesn't record keystrokes when a password is read from the
 minibuffer.  However, when the password prompt is in the terminal, the
 keys you use to type in your password gets recorded.  To prevent this
-from happening, you can use the command @command{eat-send-command},
+from happening, you can use the command @command{eat-send-password},
 it'll read password from the minibuffer and send it.  Since the
 password is read from the minibuffer, it's not recorded.
 
