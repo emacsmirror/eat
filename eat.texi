@@ -75,6 +75,7 @@ Advanced Customizations
 * Clipboard::           Integrating kill ring with terminal.
 * Colors::              Eat can show more than sixteen million colors.
 * Fonts::               Eat can show up to sixteen different fonts.
+* Sixel::               Eat can render Sixel graphics.
 * Blinking Text::       Annoying blinking texts.
 * Performance Tuning::  Fine tuning to maximize performance.
 
